@@ -1,0 +1,28 @@
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+  <div class="container">
+    <a class="navbar-brand" routerLink="/">Smart Task Planner</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav me-auto">
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/tasks" routerLinkActive="active">Tasks</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" routerLink="/plan" routerLinkActive="active">Execution Plan</a>
+        </li>
+      </ul>
+      <a class="btn btn-light" routerLink="/tasks/new">Create Task</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container">
+  <div *ngIf="taskService.error$ | async as errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
+    <strong>Error:</strong> {{ errorMessage }}
+    <button type="button" class="btn-close" (click)="taskService.setError(null)" aria-label="Close"></button>
+  </div>
+  
+  <router-outlet></router-outlet>
+</div>

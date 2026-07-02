@@ -1,0 +1,67 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Task List</h2>
+    <div class="w-25">
+        <input type="text" class="form-control" placeholder="Search by title or category..." [(ngModel)]="searchTerm">
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Title</th>
+                    <th>Category</th>
+                    <th>Type</th>
+                    <th>Priority</th>
+                    <th>Effort</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <!--
+              KEY FIX: Subscribe to filteredTasks$ EXACTLY ONCE using "as tasks".
+              Previously, the template had TWO separate "| async" pipes:
+                1. *ngFor="let task of filteredTasks$ | async"
+                2. *ngIf="(filteredTasks$ | async)?.length === 0"
+              Each | async creates its own subscription → 2 subscriptions → 2 API calls.
+              Now we subscribe once here, assign the result to "tasks", and reuse it below.
+            -->
+            <tbody *ngIf="filteredTasks$ | async as tasks">
+                <tr *ngFor="let task of tasks">
+                    <td>
+                        <a [routerLink]="['/tasks/view', task.id]" class="text-decoration-none fw-bold">{{ task.title }}</a>
+                    </td>
+                    <td>{{ task.category || '-' }}</td>
+                    <td>{{ TaskType[task.type] }}</td>
+                    <td>
+                        <span class="badge" 
+                              [class.bg-danger]="task.priority === Priority.High"
+                              [class.bg-warning]="task.priority === Priority.Medium"
+                              [class.bg-info]="task.priority === Priority.Low">
+                            {{ Priority[task.priority] }}
+                        </span>
+                    </td>
+                    <td>{{ task.estimatedEffort }}</td>
+                    <td>
+                        <span class="badge bg-secondary">{{ TaskStatus[task.status] }}</span>
+                    </td>
+                    <td>
+                        <a [routerLink]="['/tasks/edit', task.id]" class="btn btn-sm btn-outline-primary me-2">Edit</a>
+                        <button class="btn btn-sm btn-outline-danger" (click)="deleteTask(task.id)">Delete</button>
+                    </td>
+                </tr>
+                <tr *ngIf="tasks.length === 0">
+                    <td colspan="7" class="text-center py-4 text-muted">No tasks found. Create one to get started!</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="d-flex justify-content-center mt-3" *ngIf="!searchTerm && hasNextPage">
+    <button class="btn btn-primary" (click)="loadMore()" [disabled]="isPageLoading">
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" *ngIf="isPageLoading"></span>
+        {{ isPageLoading ? 'Loading...' : 'Load More Tasks' }}
+    </button>
+</div>

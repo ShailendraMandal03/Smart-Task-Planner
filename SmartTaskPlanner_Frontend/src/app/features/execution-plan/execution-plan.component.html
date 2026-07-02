@@ -1,0 +1,60 @@
+<div class="mb-4">
+  <h2>Smart Execution Plan</h2>
+  <p class="text-muted">
+    Tasks are ordered by dependencies first,and tied tasks are ordered by Priority (High to Low) and then Estimated Effort (Low to High).
+  </p>
+</div>
+
+<div class="card shadow-sm border-primary">
+  <div class="card-body">
+
+    <div *ngIf="errorMessage" class="alert alert-danger" role="alert">
+      <strong>Execution plan could not be generated.</strong>
+      <div>{{ errorMessage }}</div>
+    </div>
+
+    <div class="timeline" *ngIf="!isLoading && !errorMessage">
+
+      <div *ngIf="executionPlan.length === 0" class="text-center py-4 text-muted">
+        No tasks available to plan.
+      </div>
+
+      <div class="list-group list-group-numbered">
+        <a *ngFor="let task of executionPlan"
+           [routerLink]="['/tasks/view', task.id]"
+           class="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
+
+          <div class="ms-2 me-auto">
+            <div class="fw-bold">{{ task.title }}</div>
+            <small class="text-muted">{{ task.description | slice:0:50 }}{{ (task.description || '').length > 50 ? '...' : '' }}</small>
+            <div>
+              <span class="badge bg-secondary me-1">{{ TaskType[task.type] }}</span>
+              <span class="badge bg-light text-dark border">{{ task.category || 'General' }}</span>
+            </div>
+          </div>
+
+          <div class="text-end">
+            <span class="badge rounded-pill mb-1 d-block"
+                  [class.bg-danger]="task.priority === Priority.High"
+                  [class.bg-warning]="task.priority === Priority.Medium"
+                  [class.bg-info]="task.priority === Priority.Low">
+              {{ Priority[task.priority] }} Priority
+            </span>
+            <span class="badge bg-dark rounded-pill">Effort: {{ task.estimatedEffort }}</span>
+          </div>
+
+        </a>
+      </div>
+
+    </div>
+
+    <div *ngIf="isLoading" class="text-center py-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading plan...</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
