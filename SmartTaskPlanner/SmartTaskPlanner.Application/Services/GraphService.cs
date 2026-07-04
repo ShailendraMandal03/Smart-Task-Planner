@@ -19,14 +19,12 @@ public class GraphService : IGraphService
         
         tasksDict[newTaskOrUpdatedTask.Id] = newTaskOrUpdatedTask;
 
-        // checking for self-dependency
         if (newTaskOrUpdatedTask.Dependencies.Contains(newTaskOrUpdatedTask.Id))
         {
             _logger.LogWarning("Self-dependency detected for task {TaskId}", newTaskOrUpdatedTask.Id);
             throw new SelfDependencyException("A task cannot depend on itself.");
         }
 
-        // Checking for missing dependencies
         foreach (var depId in newTaskOrUpdatedTask.Dependencies)
         {
             if (!tasksDict.ContainsKey(depId))
@@ -36,7 +34,6 @@ public class GraphService : IGraphService
             }
         }
 
-        // checking Cycle Detection using DFS algorithm
         var visited = new HashSet<string>();
         var recursionStack = new HashSet<string>();
         var currentPath = new List<string>();
