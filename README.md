@@ -194,6 +194,8 @@ Nemetschek_Assignment/
     └── src/
         └── app/
             ├── core/
+            │   ├── confirm-modal/         ← Confirmation modal component
+            │   ├── cycle-dialog/          ← Cycle error dialog component
             │   ├── models/                ← TypeScript interfaces
             │   └── services/              ← HTTP service layer (API calls)
             └── features/
