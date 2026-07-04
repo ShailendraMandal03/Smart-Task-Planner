@@ -13,7 +13,7 @@ public class GraphService : IGraphService
     {
         _logger = logger;
     }
-    public void EnsureNoCyclesOrInvalidDependencies(IEnumerable<TaskItem> allTasks, TaskItem newTaskOrUpdatedTask)
+    public void ValidateGraph(IEnumerable<TaskItem> allTasks, TaskItem newTaskOrUpdatedTask)
     {
         var tasksDict = allTasks.ToDictionary(t => t.Id);
         
@@ -108,7 +108,7 @@ public class GraphService : IGraphService
             }
         }
 
-        var queue = new PriorityQueue<TaskItem, TaskItem>(new TaskExecutionComparer());
+        var queue = new PriorityQueue<TaskItem, TaskItem>(new MyComparer());
 
         foreach (var task in tasksList)
         {
@@ -159,7 +159,7 @@ public class GraphService : IGraphService
         return executionPlan;
     }
 
-    private class TaskExecutionComparer : IComparer<TaskItem>
+    private class MyComparer : IComparer<TaskItem>
     {
         public int Compare(TaskItem? x, TaskItem? y)
         {

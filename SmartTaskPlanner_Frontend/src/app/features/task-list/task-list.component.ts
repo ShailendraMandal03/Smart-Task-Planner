@@ -17,8 +17,10 @@ import { BehaviorSubject, of, Observable } from 'rxjs';
   styleUrls: ['./task-list.component.css']
 })
 export class TaskListComponent implements OnInit {
-  private taskService = inject(TaskService);
-  private confirmModal = inject(ConfirmModalService);
+  public filteredTasks$: Observable<TaskItem[]>;
+  constructor(private taskService: TaskService, private confirmModal: ConfirmModalService) {
+    this.filteredTasks$ = this.taskService.paginatedTasks$;
+  }
   
   public Priority = Priority;
   public TaskStatus = TaskStatus;
@@ -34,7 +36,6 @@ export class TaskListComponent implements OnInit {
     this.searchTermSubject.next(value);
   }
 
-  public filteredTasks$: Observable<TaskItem[]> = this.taskService.paginatedTasks$;
 
   get hasNextPage(): boolean {
     return this.taskService.hasNextPage;

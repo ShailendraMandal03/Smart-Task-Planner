@@ -11,7 +11,7 @@ namespace SmartTaskPlanner.Tests;
 /// Unit tests for <see cref="GraphService"/>.
 /// Covers:
 ///  - GenerateExecutionPlan: topological order, priority ordering, effort tie-breaking, ID tie-breaking
-///  - EnsureNoCyclesOrInvalidDependencies: self-dependency, missing dep, direct cycle, indirect cycle
+///  - ValidateGraph: self-dependency, missing dep, direct cycle, indirect cycle
 ///  - Edge cases: empty list, single task, disconnected graph
 /// </summary>
 public class GraphServiceTests
@@ -210,7 +210,7 @@ public class GraphServiceTests
             _sut.GenerateExecutionPlan(new[] { a, b, c }));
     }
 
-    // EnsureNoCyclesOrInvalidDependencies — Self-dependency
+    // ValidateGraph — Self-dependency
 
     [Fact]
     public void EnsureNoCycles_SelfDependency_ThrowsSelfDependencyException()
@@ -218,11 +218,11 @@ public class GraphServiceTests
         var task = MakeTask("T1", deps: "T1"); // depends on itself
 
         Assert.Throws<SelfDependencyException>(() =>
-            _sut.EnsureNoCyclesOrInvalidDependencies(Enumerable.Empty<TaskItem>(), task));
+            _sut.ValidateGraph(Enumerable.Empty<TaskItem>(), task));
     }
 
 
-    // EnsureNoCyclesOrInvalidDependencies — Missing Dependency
+    // ValidateGraph — Missing Dependency
 
     [Fact]
     public void EnsureNoCycles_MissingDependency_ThrowsDependencyNotFoundException()
@@ -231,11 +231,11 @@ public class GraphServiceTests
         var allTasks = new[] { MakeTask("T2") }; // NON_EXISTENT is not in allTasks
 
         Assert.Throws<DependencyNotFoundException>(() =>
-            _sut.EnsureNoCyclesOrInvalidDependencies(allTasks, task));
+            _sut.ValidateGraph(allTasks, task));
     }
 
 
-    // EnsureNoCyclesOrInvalidDependencies — Cycle Detection (DFS)
+    // ValidateGraph — Cycle Detection (DFS)
 
     [Fact]
     public void EnsureNoCycles_IntroducesDirectCycle_ThrowsCircularDependencyException()
@@ -249,7 +249,7 @@ public class GraphServiceTests
         var updatedA = MakeTask("A", deps: "B");
 
         Assert.Throws<CircularDependencyException>(() =>
-            _sut.EnsureNoCyclesOrInvalidDependencies(new[] { existingA, existingB }, updatedA));
+            _sut.ValidateGraph(new[] { existingA, existingB }, updatedA));
     }
 
     [Fact]
@@ -262,7 +262,7 @@ public class GraphServiceTests
         var c = MakeTask("C", deps: "B");
 
         var exception = Record.Exception(() =>
-            _sut.EnsureNoCyclesOrInvalidDependencies(new[] { a, b }, c));
+            _sut.ValidateGraph(new[] { a, b }, c));
 
         Assert.Null(exception);
     }
@@ -273,7 +273,7 @@ public class GraphServiceTests
         var newTask = MakeTask("STANDALONE");
 
         var exception = Record.Exception(() =>
-            _sut.EnsureNoCyclesOrInvalidDependencies(new[] { MakeTask("T1") }, newTask));
+            _sut.ValidateGraph(new[] { MakeTask("T1") }, newTask));
 
         Assert.Null(exception);
     }

@@ -8,7 +8,7 @@ import { TaskItem, CreateTaskDto, UpdateTaskDto, PagedResponse } from '../models
   providedIn: 'root'
 })
 export class TaskService {
-  private api = inject(ApiService);
+  constructor(private api: ApiService) {}
   private paginatedTasksSubject = new BehaviorSubject<TaskItem[]>([]);
   public paginatedTasks$ = this.paginatedTasksSubject.asObservable();
   
@@ -16,8 +16,6 @@ export class TaskService {
   public hasNextPage = false;
   public isPageLoading = false;
   public isInitialLoading = true;  // true until the very first page response arrives
-  
-  constructor() {}
 
   getTaskLookup(): Observable<{id: string, title: string, category: string, status: number}[]> {
     return this.api.get<{id: string, title: string, category: string, status: number}[]>('/tasks/lookup');

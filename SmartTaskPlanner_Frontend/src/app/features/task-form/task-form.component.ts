@@ -16,12 +16,14 @@ import { CycleDialogComponent } from '../../core/cycle-dialog/cycle-dialog.compo
   styleUrls: ['./task-form.component.css']
 })
 export class TaskFormComponent implements OnInit {
-  private fb = inject(FormBuilder);
-  private taskService = inject(TaskService);
-  private router = inject(Router);
-  private route = inject(ActivatedRoute);
-  private destroyRef = inject(DestroyRef);
-  private cycleDialog = inject(CycleDialogService);
+  constructor(
+    private fb: FormBuilder,
+    private taskService: TaskService,
+    private router: Router,
+    private route: ActivatedRoute,
+    private destroyRef: DestroyRef,
+    private cycleDialog: CycleDialogService
+  ) {}
 
   public taskForm!: FormGroup;
   public isEditMode = false;
@@ -118,6 +120,9 @@ export class TaskFormComponent implements OnInit {
             category: responseTask.category || '',
             status: responseTask.status
           }];
+        } else if (this.isEditMode) {
+          // Redirect to home task page after successful update
+          this.router.navigate(['/tasks']);
         }
       },
       error: (err) => {

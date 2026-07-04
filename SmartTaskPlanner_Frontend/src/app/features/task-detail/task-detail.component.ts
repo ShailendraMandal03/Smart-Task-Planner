@@ -15,9 +15,7 @@ import { TaskItem, Priority, TaskStatus, TaskType } from '../../core/models/task
   styleUrls: ['./task-detail.component.css']
 })
 export class TaskDetailComponent implements OnInit {
-  private route = inject(ActivatedRoute);
-  private taskService = inject(TaskService);
-  private destroyRef = inject(DestroyRef);
+  constructor(private route: ActivatedRoute, private taskService: TaskService, private destroyRef: DestroyRef) {}
 
   public task: TaskItem | null = null;
   public dependencies: {id: string, title: string, category: string, status: number}[] = [];

@@ -90,7 +90,7 @@ public class TaskService : ITaskService
         
         try
         {
-            _graphService.EnsureNoCyclesOrInvalidDependencies(allTasks, newTask);
+            _graphService.ValidateGraph(allTasks, newTask);
         }
         catch (CircularDependencyException) when (force)
         {
@@ -132,7 +132,7 @@ public class TaskService : ITaskService
         _logger.LogInformation("Validating graph for updated task dependencies");
         try
         {
-            _graphService.EnsureNoCyclesOrInvalidDependencies(allTasks, tempTask);
+            _graphService.ValidateGraph(allTasks, tempTask);
         }
         catch (CircularDependencyException) when (force)
         {

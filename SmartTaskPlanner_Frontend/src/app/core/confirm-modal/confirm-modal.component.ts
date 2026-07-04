@@ -10,7 +10,7 @@ import { ConfirmModalService } from './confirm-modal.service';
   styleUrls: ['./confirm-modal.component.css']
 })
 export class ConfirmModalComponent {
-  public modalService = inject(ConfirmModalService);
+  constructor(public modalService: ConfirmModalService) {}
 
 
   get isVisible(): boolean {

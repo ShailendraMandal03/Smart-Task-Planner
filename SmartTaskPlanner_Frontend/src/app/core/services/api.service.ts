@@ -8,8 +8,8 @@ import { environment } from '../../../environments/environment';
   providedIn: 'root'
 })
 export class ApiService {
-  private http = inject(HttpClient);
   public apiUrl = environment.apiUrl;
+  constructor(private http: HttpClient) {}
 
   public get<T>(path: string): Observable<T> {
     return this.http.get<T>(`${this.apiUrl}${path}`).pipe(catchError(this.handleError));

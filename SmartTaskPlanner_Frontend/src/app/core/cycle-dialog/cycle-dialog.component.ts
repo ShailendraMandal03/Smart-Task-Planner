@@ -10,6 +10,8 @@ import { CycleDialogService } from './cycle-dialog.service';
   styleUrls: ['./cycle-dialog.component.css']
 })
 export class CycleDialogComponent {
-  public modalService = inject(CycleDialogService);
-  public isVisible$ = this.modalService.isVisible$;
+  public isVisible$;
+  constructor(public modalService: CycleDialogService) {
+    this.isVisible$ = this.modalService.isVisible$;
+  }
 }

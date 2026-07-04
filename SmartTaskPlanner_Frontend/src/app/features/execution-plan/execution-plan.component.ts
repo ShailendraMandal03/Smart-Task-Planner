@@ -14,8 +14,7 @@ import { CycleDialogComponent } from '../../core/cycle-dialog/cycle-dialog.compo
   styleUrls: ['./execution-plan.component.css']
 })
 export class ExecutionPlanComponent implements OnInit {
-  private taskService = inject(TaskService);
-  private cycleDialog = inject(CycleDialogService);
+  constructor(private taskService: TaskService, private cycleDialog: CycleDialogService) {}
 
   public executionPlan: TaskItem[] = [];
   public isLoading = true;

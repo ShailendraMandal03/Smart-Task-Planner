@@ -12,5 +12,5 @@ import { TaskService } from './core/services/task.service';
 })
 export class AppComponent {
   title = 'Smart Task Planner';
-  taskService = inject(TaskService);
+  constructor(public taskService: TaskService) {}
 }

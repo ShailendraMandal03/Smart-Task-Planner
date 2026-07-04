@@ -28,7 +28,7 @@ namespace SmartTaskPlanner.Tests;
 public class TaskServiceTests
 {
     // ── Mocks ─────────────────────────────────────────────────────────────────
-    private readonly Mock<ITaskRepository> _repoMock = new();
+    private readonly Mock<ITaskRepository> repo = new();
     private readonly Mock<IGraphService> _graphMock = new();
     private readonly Mock<ITaskFactory> _factoryMock = new();
 
@@ -38,7 +38,7 @@ public class TaskServiceTests
     public TaskServiceTests()
     {
         _sut = new TaskService(
-            _repoMock.Object,
+            repo.Object,
             _graphMock.Object,
             _factoryMock.Object,
             NullLogger<TaskService>.Instance);
@@ -72,7 +72,7 @@ public class TaskServiceTests
     {
         // NOTE: Moq expression trees do not support optional arguments.
         // We must pass It.IsAny<CancellationToken>() explicitly for every mock setup.
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(Enumerable.Empty<TaskItem>());
 
         var result = await _sut.GetAllTasksAsync();
@@ -84,7 +84,7 @@ public class TaskServiceTests
     public async Task GetAllTasksAsync_MultipleItems_ReturnsMappedDtos()
     {
         var tasks = new[] { MakeEntity("T1", "Task One"), MakeEntity("T2", "Task Two") };
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(tasks);
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(tasks);
 
         var result = (await _sut.GetAllTasksAsync()).ToList();
 
@@ -96,11 +96,11 @@ public class TaskServiceTests
     [Fact]
     public async Task GetAllTasksAsync_RepositoryCalledExactlyOnce()
     {
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<TaskItem>());
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<TaskItem>());
 
         await _sut.GetAllTasksAsync();
 
-        _repoMock.Verify(r => r.GetAllAsync(It.IsAny<CancellationToken>()), Times.Once);
+        repo.Verify(r => r.GetAllAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     
@@ -109,7 +109,7 @@ public class TaskServiceTests
     public async Task GetTaskByIdAsync_ExistingId_ReturnsMappedDto()
     {
         var entity = MakeEntity("T1", "Found Task");
-        _repoMock.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
+        repo.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
 
         var result = await _sut.GetTaskByIdAsync("T1");
 
@@ -120,7 +120,7 @@ public class TaskServiceTests
     [Fact]
     public async Task GetTaskByIdAsync_NonExistingId_ThrowsTaskNotFoundException()
     {
-        _repoMock.Setup(r => r.GetByIdAsync("GHOST", It.IsAny<CancellationToken>())).ReturnsAsync((TaskItem?)null);
+        repo.Setup(r => r.GetByIdAsync("GHOST", It.IsAny<CancellationToken>())).ReturnsAsync((TaskItem?)null);
 
         await Assert.ThrowsAsync<TaskNotFoundException>(() => _sut.GetTaskByIdAsync("GHOST"));
     }
@@ -138,9 +138,9 @@ public class TaskServiceTests
                 dto.EstimatedEffort, dto.Category, dto.Type, dto.Dependencies))
             .Returns(createdEntity);
 
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<TaskItem>());
-        _graphMock.Setup(g => g.EnsureNoCyclesOrInvalidDependencies(It.IsAny<IEnumerable<TaskItem>>(), createdEntity));
-        _repoMock.Setup(r => r.AddAsync(createdEntity, It.IsAny<CancellationToken>())).ReturnsAsync(createdEntity);
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<TaskItem>());
+        _graphMock.Setup(g => g.ValidateGraph(It.IsAny<IEnumerable<TaskItem>>(), createdEntity));
+        repo.Setup(r => r.AddAsync(createdEntity, It.IsAny<CancellationToken>())).ReturnsAsync(createdEntity);
 
         var result = await _sut.CreateTaskAsync(dto);
 
@@ -159,8 +159,8 @@ public class TaskServiceTests
                 It.IsAny<int>(), It.IsAny<string>(), It.IsAny<TaskType>(), It.IsAny<List<string>>()))
             .Returns(entity);
 
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<TaskItem>());
-        _repoMock.Setup(r => r.AddAsync(entity, It.IsAny<CancellationToken>())).ReturnsAsync(entity);
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<TaskItem>());
+        repo.Setup(r => r.AddAsync(entity, It.IsAny<CancellationToken>())).ReturnsAsync(entity);
 
         await _sut.CreateTaskAsync(dto);
 
@@ -168,7 +168,7 @@ public class TaskServiceTests
             dto.Title, dto.Description, dto.Priority, dto.EstimatedEffort,
             dto.Category, dto.Type, dto.Dependencies), Times.Once);
 
-        _graphMock.Verify(g => g.EnsureNoCyclesOrInvalidDependencies(
+        _graphMock.Verify(g => g.ValidateGraph(
             It.IsAny<IEnumerable<TaskItem>>(), entity), Times.Once);
     }
 
@@ -183,15 +183,15 @@ public class TaskServiceTests
                 It.IsAny<int>(), It.IsAny<string>(), It.IsAny<TaskType>(), It.IsAny<List<string>>()))
             .Returns(entity);
 
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<TaskItem>());
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<TaskItem>());
         _graphMock
-            .Setup(g => g.EnsureNoCyclesOrInvalidDependencies(It.IsAny<IEnumerable<TaskItem>>(), entity))
+            .Setup(g => g.ValidateGraph(It.IsAny<IEnumerable<TaskItem>>(), entity))
             .Throws(new CircularDependencyException("Cycle detected"));
 
         await Assert.ThrowsAsync<CircularDependencyException>(() => _sut.CreateTaskAsync(dto));
 
         // AddAsync must NOT be called when validation fails
-        _repoMock.Verify(r => r.AddAsync(It.IsAny<TaskItem>(), It.IsAny<CancellationToken>()), Times.Never);
+        repo.Verify(r => r.AddAsync(It.IsAny<TaskItem>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     
@@ -202,17 +202,17 @@ public class TaskServiceTests
         var entity = MakeEntity("T1");
         var dto = MakeUpdateDto();
 
-        _repoMock.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity });
-        _repoMock.Setup(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repo.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity });
+        repo.Setup(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         await _sut.UpdateTaskAsync("T1", dto);
 
         // Verify business rules are re-applied and graph validation runs
         _factoryMock.Verify(f => f.ApplyBusinessRules(entity), Times.Once);
-        _graphMock.Verify(g => g.EnsureNoCyclesOrInvalidDependencies(
+        _graphMock.Verify(g => g.ValidateGraph(
             It.IsAny<IEnumerable<TaskItem>>(), It.IsAny<TaskItem>()), Times.Once);
-        _repoMock.Verify(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>()), Times.Once);
+        repo.Verify(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -235,9 +235,9 @@ public class TaskServiceTests
             "Bug Task", "A bug", Priority.Low, 1, "Backend",
             TaskType.Bug, TaskStatus.ToDo, new List<string>());
 
-        _repoMock.Setup(r => r.GetByIdAsync("B-301", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity });
-        _repoMock.Setup(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repo.Setup(r => r.GetByIdAsync("B-301", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity });
+        repo.Setup(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         // Make the mock actually apply the real business rule so we can assert the outcome
         _factoryMock
@@ -261,7 +261,7 @@ public class TaskServiceTests
     [Fact]
     public async Task UpdateTaskAsync_NonExistingId_ThrowsTaskNotFoundException()
     {
-        _repoMock.Setup(r => r.GetByIdAsync("GHOST", It.IsAny<CancellationToken>())).ReturnsAsync((TaskItem?)null);
+        repo.Setup(r => r.GetByIdAsync("GHOST", It.IsAny<CancellationToken>())).ReturnsAsync((TaskItem?)null);
 
         await Assert.ThrowsAsync<TaskNotFoundException>(() =>
             _sut.UpdateTaskAsync("GHOST", MakeUpdateDto()));
@@ -273,9 +273,9 @@ public class TaskServiceTests
         var entity = MakeEntity("T1", "Old Title");
         var dto = MakeUpdateDto("New Title");
 
-        _repoMock.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity });
-        _repoMock.Setup(r => r.UpdateAsync(It.IsAny<TaskItem>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repo.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity });
+        repo.Setup(r => r.UpdateAsync(It.IsAny<TaskItem>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         await _sut.UpdateTaskAsync("T1", dto);
 
@@ -291,16 +291,16 @@ public class TaskServiceTests
         var entity = MakeEntity("T1");
         var dto = MakeUpdateDto();
 
-        _repoMock.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity });
+        repo.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity });
         _graphMock
-            .Setup(g => g.EnsureNoCyclesOrInvalidDependencies(It.IsAny<IEnumerable<TaskItem>>(), It.IsAny<TaskItem>()))
+            .Setup(g => g.ValidateGraph(It.IsAny<IEnumerable<TaskItem>>(), It.IsAny<TaskItem>()))
             .Throws(new CircularDependencyException("Cycle detected"));
 
         await Assert.ThrowsAsync<CircularDependencyException>(() =>
             _sut.UpdateTaskAsync("T1", dto));
 
-        _repoMock.Verify(r => r.UpdateAsync(It.IsAny<TaskItem>(), It.IsAny<CancellationToken>()), Times.Never);
+        repo.Verify(r => r.UpdateAsync(It.IsAny<TaskItem>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     
@@ -309,19 +309,19 @@ public class TaskServiceTests
     public async Task DeleteTaskAsync_ExistingIdNoDependents_DeletesSuccessfully()
     {
         var entity = MakeEntity("T1");
-        _repoMock.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity }); // only itself, no other task depends on it
-        _repoMock.Setup(r => r.DeleteAsync("T1", It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
+        repo.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity }); // only itself, no other task depends on it
+        repo.Setup(r => r.DeleteAsync("T1", It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         await _sut.DeleteTaskAsync("T1");
 
-        _repoMock.Verify(r => r.DeleteAsync("T1", It.IsAny<CancellationToken>()), Times.Once);
+        repo.Verify(r => r.DeleteAsync("T1", It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task DeleteTaskAsync_NonExistingId_ThrowsTaskNotFoundException()
     {
-        _repoMock.Setup(r => r.GetByIdAsync("GHOST", It.IsAny<CancellationToken>())).ReturnsAsync((TaskItem?)null);
+        repo.Setup(r => r.GetByIdAsync("GHOST", It.IsAny<CancellationToken>())).ReturnsAsync((TaskItem?)null);
 
         await Assert.ThrowsAsync<TaskNotFoundException>(() => _sut.DeleteTaskAsync("GHOST"));
     }
@@ -342,12 +342,12 @@ public class TaskServiceTests
             status: TaskStatus.ToDo,
             createdAt: DateTime.UtcNow);
 
-        _repoMock.Setup(r => r.GetByIdAsync("A", It.IsAny<CancellationToken>())).ReturnsAsync(target);
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { target, dependent });
+        repo.Setup(r => r.GetByIdAsync("A", It.IsAny<CancellationToken>())).ReturnsAsync(target);
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { target, dependent });
 
         await Assert.ThrowsAsync<DomainException>(() => _sut.DeleteTaskAsync("A"));
 
-        _repoMock.Verify(r => r.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        repo.Verify(r => r.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     
@@ -356,7 +356,7 @@ public class TaskServiceTests
     public async Task GenerateExecutionPlanAsync_DelegatesToGraphService()
     {
         var tasks = new[] { MakeEntity("A"), MakeEntity("B") };
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(tasks);
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(tasks);
         _graphMock.Setup(g => g.GenerateExecutionPlan(tasks)).Returns(tasks);
 
         var result = (await _sut.GenerateExecutionPlanAsync()).ToList();
@@ -370,7 +370,7 @@ public class TaskServiceTests
     {
         var a = MakeEntity("A", "Alpha");
         var b = MakeEntity("B", "Beta");
-        _repoMock.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { a, b });
+        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { a, b });
         _graphMock.Setup(g => g.GenerateExecutionPlan(It.IsAny<IEnumerable<TaskItem>>()))
             .Returns(new[] { a, b }); // already ordered
 
@@ -387,7 +387,7 @@ public class TaskServiceTests
     public async Task GetPagedTasksAsync_FirstPageWithoutCursor_CallsRepositoryAndReturnsMappedResponse()
     {
         var tasks = new[] { MakeEntity("T1"), MakeEntity("T2") };
-        _repoMock.Setup(r => r.GetPagedAsync(null, 3, It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(tasks);
+        repo.Setup(r => r.GetPagedAsync(null, 3, It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(tasks);
 
         var result = await _sut.GetPagedTasksAsync(null, 2);
 
@@ -395,7 +395,7 @@ public class TaskServiceTests
         Assert.Equal(2, result.Items.Count());
         Assert.False(result.HasNext);
         Assert.Null(result.NextCursor);
-        _repoMock.Verify(r => r.GetPagedAsync(null, 3, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+        repo.Verify(r => r.GetPagedAsync(null, 3, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -403,7 +403,7 @@ public class TaskServiceTests
     {
         // Request page size of 2, repository receives size 3, returns 3 items
         var tasks = new[] { MakeEntity("T1"), MakeEntity("T2"), MakeEntity("T3") };
-        _repoMock.Setup(r => r.GetPagedAsync(null, 3, It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(tasks);
+        repo.Setup(r => r.GetPagedAsync(null, 3, It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(tasks);
 
         var result = await _sut.GetPagedTasksAsync(null, 2);
 
