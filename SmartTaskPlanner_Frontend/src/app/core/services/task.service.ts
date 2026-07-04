@@ -9,56 +9,48 @@ import { TaskItem, CreateTaskDto, UpdateTaskDto, PagedResponse } from '../models
 })
 export class TaskService {
   private api = inject(ApiService);
-  private tasksSubject = new BehaviorSubject<TaskItem[]>([]);
-  public tasks$ = this.tasksSubject.asObservable();
-
   private paginatedTasksSubject = new BehaviorSubject<TaskItem[]>([]);
   public paginatedTasks$ = this.paginatedTasksSubject.asObservable();
   
   public nextCursor: string | null = null;
   public hasNextPage = false;
   public isPageLoading = false;
+  public isInitialLoading = true;  // true until the very first page response arrives
   
-  private hasLoaded = false;
+  constructor() {}
+
+  getTaskLookup(): Observable<{id: string, title: string, category: string, status: number}[]> {
+    return this.api.get<{id: string, title: string, category: string, status: number}[]>('/tasks/lookup');
+  }
 
   public errorSubject = new BehaviorSubject<string | null>(null);
   public error$ = this.errorSubject.asObservable();
 
-  constructor() {}
-
-  loadAllTasks(force = false): void {
-    if (!force && this.hasLoaded) {
-      return; // Return early if tasks are already cached
-    }
-    this.api.get<TaskItem[]>('/tasks?all=true').subscribe({
-      next: (tasks) => {
-        this.tasksSubject.next(tasks);
-        this.hasLoaded = true;
-      },
-      error: (err) => this.setError(err.message)
-    });
-  }
-
-  loadInitialPage(pageSize = 5): void {
+  loadInitialPage(pageSize = 5, search: string = ''): void {
     this.isPageLoading = true;
-    this.api.get<PagedResponse<TaskItem>>(`/tasks?pageSize=${pageSize}`).subscribe({
+    let url = `/tasks?pageSize=${pageSize}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    this.api.get<PagedResponse<TaskItem>>(url).subscribe({
       next: (res) => {
         this.paginatedTasksSubject.next(res.items);
         this.nextCursor = res.nextCursor;
         this.hasNextPage = res.hasNext;
         this.isPageLoading = false;
+        this.isInitialLoading = false; // skeleton dismissed after first load
       },
       error: (err) => {
         this.setError(err.message);
         this.isPageLoading = false;
+        this.isInitialLoading = false;
       }
     });
   }
 
-  loadNextPage(pageSize = 5): void {
+  loadNextPage(pageSize = 5, search: string = ''): void {
     if (!this.hasNextPage || !this.nextCursor || this.isPageLoading) return;
     this.isPageLoading = true;
-    const url = `/tasks?pageSize=${pageSize}&cursor=${encodeURIComponent(this.nextCursor)}`;
+    let url = `/tasks?pageSize=${pageSize}&cursor=${encodeURIComponent(this.nextCursor)}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
     this.api.get<PagedResponse<TaskItem>>(url).subscribe({
       next: (res) => {
         const currentTasks = this.paginatedTasksSubject.getValue();
@@ -76,7 +68,7 @@ export class TaskService {
 
   getTask(id: string, forceRefresh = false): Observable<TaskItem> {
     if (!forceRefresh) {
-      const cachedTask = this.tasksSubject.getValue().find(t => t.id === id);
+      const cachedTask = this.paginatedTasksSubject.getValue().find(t => t.id === id);
       if (cachedTask) {
         return of(cachedTask); // Return cached task immediately
       }
@@ -84,31 +76,16 @@ export class TaskService {
     return this.api.get<TaskItem>(`/tasks/${id}`);
   }
 
-  createTask(dto: CreateTaskDto): Observable<TaskItem> {
-    return this.api.post<TaskItem>('/tasks', dto).pipe(
-      tap(() => {
-        this.loadAllTasks(true);
-        this.loadInitialPage();
-      })
-    );
+  createTask(dto: CreateTaskDto, force = false): Observable<TaskItem> {
+    return this.api.post<TaskItem>(`/tasks?force=${force}`, dto);
   }
 
-  updateTask(id: string, dto: UpdateTaskDto): Observable<any> {
-    return this.api.put<any>(`/tasks/${id}`, dto).pipe(
-      tap(() => {
-        this.loadAllTasks(true);
-        this.loadInitialPage();
-      })
-    );
+  updateTask(id: string, dto: UpdateTaskDto, force = false): Observable<any> {
+    return this.api.put<any>(`/tasks/${id}?force=${force}`, dto);
   }
 
   deleteTask(id: string): Observable<any> {
-    return this.api.delete<any>(`/tasks/${id}`).pipe(
-      tap(() => {
-        this.loadAllTasks(true);
-        this.loadInitialPage();
-      })
-    );
+    return this.api.delete<any>(`/tasks/${id}`);
   }
 
   getExecutionPlan(): Observable<TaskItem[]> {

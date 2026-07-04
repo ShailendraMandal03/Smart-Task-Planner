@@ -22,19 +22,17 @@ public class TaskFactory : ITaskFactory
 {
     public TaskItem Create(string title, string description, Priority priority, int estimatedEffort, string category, TaskType type, List<string> dependencies)
     {
-        var task = new TaskItem
-        {
-            Id = string.Empty,
-            Title = title,
-            Description = description,
-            Priority = priority,
-            EstimatedEffort = estimatedEffort,
-            Category = category,
-            Dependencies = dependencies ?? new List<string>(),
-            Status = Enums.TaskStatus.ToDo,
-            Type = type,
-            CreatedAt = DateTime.UtcNow
-        };
+        var task = new TaskItem(
+            id: string.Empty,          
+            title: title,
+            description: description,
+            priority: priority,
+            estimatedEffort: estimatedEffort,
+            category: category,
+            type: type,
+            dependencies: dependencies ?? new List<string>(),
+            status: Enums.TaskStatus.ToDo,
+            createdAt: DateTime.UtcNow);
 
         ApplyBusinessRules(task);
 
@@ -44,23 +42,25 @@ public class TaskFactory : ITaskFactory
     /// <inheritdoc/>
     public void ApplyBusinessRules(TaskItem task)
     {
+        // These internal setters are visible only within the Domain assembly.
+        // External layers (Application, Infrastructure, API) cannot call them.
         switch (task.Type)
         {
             case TaskType.Bug:
-                task.Priority = Priority.High;
+                task.SetPriority(Priority.High);
                 break;
 
             case TaskType.Testing:
                 if (string.IsNullOrWhiteSpace(task.Category))
                 {
-                    task.Category = "Quality Assurance";
+                    task.SetCategory("Quality Assurance");
                 }
                 break;
 
             case TaskType.Development:
                 if (task.EstimatedEffort < 1)
                 {
-                    task.EstimatedEffort = 1;
+                    task.SetEstimatedEffort(1);
                 }
                 break;
         }

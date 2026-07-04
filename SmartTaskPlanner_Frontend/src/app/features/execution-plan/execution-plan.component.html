@@ -25,7 +25,7 @@
            class="list-group-item list-group-item-action d-flex justify-content-between align-items-start">
 
           <div class="ms-2 me-auto">
-            <div class="fw-bold">{{ task.title }}</div>
+            <div class="fw-bold">{{ task.title }} - {{ task.id }}</div>
             <small class="text-muted">{{ task.description | slice:0:50 }}{{ (task.description || '').length > 50 ? '...' : '' }}</small>
             <div>
               <span class="badge bg-secondary me-1">{{ TaskType[task.type] }}</span>
@@ -56,5 +56,7 @@
 
   </div>
 </div>
+
+<app-cycle-dialog></app-cycle-dialog>
 
 

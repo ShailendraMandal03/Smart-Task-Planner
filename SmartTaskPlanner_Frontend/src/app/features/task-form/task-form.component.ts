@@ -5,11 +5,13 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { TaskService } from '../../core/services/task.service';
 import { Priority, TaskStatus, TaskType, TaskItem } from '../../core/models/task.model';
+import { CycleDialogService } from '../../core/cycle-dialog/cycle-dialog.service';
+import { CycleDialogComponent } from '../../core/cycle-dialog/cycle-dialog.component';
 
 @Component({
   selector: 'app-task-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, CycleDialogComponent],
   templateUrl: './task-form.component.html',
   styleUrls: ['./task-form.component.css']
 })
@@ -19,11 +21,12 @@ export class TaskFormComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
+  private cycleDialog = inject(CycleDialogService);
 
   public taskForm!: FormGroup;
   public isEditMode = false;
   public taskId: string | null = null;
-  public allTasks: TaskItem[] = [];
+  public allTasks: {id: string, title: string, category: string, status: number}[] = [];
   public errorMessage: string | null = null;
 
   // Enum references for template
@@ -50,16 +53,11 @@ export class TaskFormComponent implements OnInit {
     this.initForm();
     this.taskId = this.route.snapshot.paramMap.get('id');
     
-    // Load all tasks for the dependencies dropdown.
-    // takeUntilDestroyed(this.destroyRef) automatically unsubscribes when the
-    // component is destroyed, preventing a memory leak.
-    this.taskService.tasks$
+    this.taskService.getTaskLookup()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(tasks => {
-        // Exclude self if editing so a task cannot depend on itself
         this.allTasks = this.taskId ? tasks.filter(t => t.id !== this.taskId) : tasks;
       });
-    this.taskService.loadAllTasks();
 
     if (this.taskId) {
       this.isEditMode = true;
@@ -97,20 +95,44 @@ export class TaskFormComponent implements OnInit {
     this.errorMessage = null;
 
     const dto = this.taskForm.value;
-    // Map string values back to numbers if needed from select
     dto.priority = Number(dto.priority);
     dto.type = Number(dto.type);
     dto.status = Number(dto.status);
 
+    this.executeSave(dto, false);
+  }
+
+  private executeSave(dto: any, force: boolean): void {
     const request$ = this.isEditMode && this.taskId
-      ? this.taskService.updateTask(this.taskId, dto)
-      : this.taskService.createTask(dto);
+      ? this.taskService.updateTask(this.taskId, dto, force)
+      : this.taskService.createTask(dto, force);
 
     request$.subscribe({
-      next: () => this.router.navigate(['/tasks']),
+      next: (responseTask) => {
+        if (!this.isEditMode && responseTask) {
+          this.taskForm.reset(); // Reset form for the next task
+          // Instead of making another API call, we just inject the new task into our local list!
+          this.allTasks = [...this.allTasks, {
+            id: responseTask.id,
+            title: responseTask.title,
+            category: responseTask.category || '',
+            status: responseTask.status
+          }];
+        }
+      },
       error: (err) => {
-        this.errorMessage = err.message;
-        this.taskService.setError(err.message);
+        if (err.status === 409 && err.error?.cyclePath) {
+          const cyclePath = err.error.cyclePath;
+          this.cycleDialog.open(cyclePath, 'confirm').subscribe(confirmed => {
+            if (confirmed) {
+              this.executeSave(dto, true); 
+            }
+          });
+        } else {
+          const msg = err.message || 'An unknown error occurred';
+          this.errorMessage = msg;
+          this.taskService.setError(msg);
+        }
       }
     });
   }

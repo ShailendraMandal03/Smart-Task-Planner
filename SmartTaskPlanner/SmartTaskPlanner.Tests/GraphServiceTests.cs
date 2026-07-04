@@ -26,19 +26,17 @@ public class GraphServiceTests
 
 
     private static TaskItem MakeTask(string id, Priority priority = Priority.Medium,
-        int effort = 1, params string[] deps) => new()
-    {
-        Id = id,
-        Title = $"Task {id}",
-        Description = string.Empty,
-        Priority = priority,
-        EstimatedEffort = effort,
-        Category = "Test",
-        Type = TaskType.General,
-        Dependencies = deps.ToList(),
-        Status = TaskStatus.ToDo,
-        CreatedAt = DateTime.UtcNow
-    };
+        int effort = 1, params string[] deps) => new(
+        id: id,
+        title: $"Task {id}",
+        description: string.Empty,
+        priority: priority,
+        estimatedEffort: effort,
+        category: "Test",
+        type: TaskType.General,
+        dependencies: deps.ToList(),
+        status: TaskStatus.ToDo,
+        createdAt: DateTime.UtcNow);
 
 
     [Fact]
@@ -61,7 +59,6 @@ public class GraphServiceTests
     [Fact]
     public void GenerateExecutionPlan_LinearChain_RespectsOrder()
     {
-        // A → B → C  (B depends on A, C depends on B)
         var a = MakeTask("A");
         var b = MakeTask("B", Priority.Medium, 1, "A");
         var c = MakeTask("C", Priority.Medium, 1, "B");

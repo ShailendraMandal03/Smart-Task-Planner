@@ -2,13 +2,14 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+import { environment } from '../../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ApiService {
   private http = inject(HttpClient);
-  public apiUrl = 'http://localhost:5000/api'; // Standard default port, might need adjustment
+  public apiUrl = environment.apiUrl;
 
   public get<T>(path: string): Observable<T> {
     return this.http.get<T>(`${this.apiUrl}${path}`).pipe(catchError(this.handleError));
@@ -27,6 +28,11 @@ export class ApiService {
   }
 
   private handleError(error: HttpErrorResponse) {
+    // Preserve 409 Conflicts so components can read the cyclePath
+    if (error.status === 409) {
+      return throwError(() => error);
+    }
+
     let errorMessage = 'An unknown error occurred!';
     if (error.error instanceof ErrorEvent) {
       // Client-side errors

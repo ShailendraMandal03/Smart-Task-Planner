@@ -22,19 +22,18 @@ public class TaskService : ITaskService
         _logger = logger;
     }
 
-    public async Task<IEnumerable<TaskResponseDto>> GetAllTasksAsync()
+    public async Task<IEnumerable<TaskResponseDto>> GetAllTasksAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Retrieving all tasks from repository");
-        var tasks = await _taskRepository.GetAllAsync();
+        var tasks = await _taskRepository.GetAllAsync(ct);
         return tasks.Select(MapToDto);
     }
 
-    public async Task<PagedResponseDto<TaskResponseDto>> GetPagedTasksAsync(string? cursor, int pageSize)
+    public async Task<PagedResponseDto<TaskResponseDto>> GetPagedTasksAsync(string? cursor, int pageSize, string? search = null, CancellationToken ct = default)
     {
-        _logger.LogInformation("Retrieving paged tasks with pageSize {PageSize} and cursor {Cursor}", pageSize, cursor);
+        _logger.LogInformation("Retrieving paged tasks with pageSize {PageSize}, cursor {Cursor}, search {Search}", pageSize, cursor, search);
         
-        // Fetch pageSize + 1 to check if there is a next page
-        var tasks = (await _taskRepository.GetPagedAsync(cursor, pageSize + 1)).ToList();
+        var tasks = (await _taskRepository.GetPagedAsync(cursor, pageSize + 1, search, ct)).ToList();
         
         var hasNext = tasks.Count > pageSize;
         var itemsToReturn = tasks.Take(pageSize).ToList();
@@ -54,10 +53,10 @@ public class TaskService : ITaskService
             hasNext);
     }
 
-    public async Task<TaskResponseDto> GetTaskByIdAsync(string id)
+    public async Task<TaskResponseDto> GetTaskByIdAsync(string id, CancellationToken ct = default)
     {
         _logger.LogInformation("Retrieving task with ID: {TaskId}", id);
-        var task = await _taskRepository.GetByIdAsync(id);
+        var task = await _taskRepository.GetByIdAsync(id, ct);
         if (task == null)
         {
             _logger.LogWarning("Task with ID {TaskId} not found", id);
@@ -67,7 +66,14 @@ public class TaskService : ITaskService
         return MapToDto(task);
     }
 
-    public async Task<TaskResponseDto> CreateTaskAsync(CreateTaskDto dto)
+    public async Task<IEnumerable<TaskLookupDto>> GetTaskLookupAsync(CancellationToken ct = default)
+    {
+        _logger.LogInformation("Retrieving all tasks for lookup");
+        var tasks = await _taskRepository.GetAllAsync(ct);
+        return tasks.Select(t => new TaskLookupDto(t.Id, t.Title, t.Category, t.Status));
+    }
+
+    public async Task<TaskResponseDto> CreateTaskAsync(CreateTaskDto dto, bool force = false, CancellationToken ct = default)
     {
         _logger.LogInformation("Creating new task with Title: {Title}, Type: {Type}", dto.Title, dto.Type);
         var newTask = _taskFactory.Create(
@@ -79,72 +85,101 @@ public class TaskService : ITaskService
             dto.Type, 
             dto.Dependencies);
 
-        var allTasks = await _taskRepository.GetAllAsync();
+        var allTasks = await _taskRepository.GetAllAsync(ct);
         _logger.LogInformation("Validating graph for new task dependencies");
-        _graphService.EnsureNoCyclesOrInvalidDependencies(allTasks, newTask);
+        
+        try
+        {
+            _graphService.EnsureNoCyclesOrInvalidDependencies(allTasks, newTask);
+        }
+        catch (CircularDependencyException) when (force)
+        {
+            _logger.LogWarning("Bypassing circular dependency check for new task due to force flag.");
+        }
 
-        var createdTask = await _taskRepository.AddAsync(newTask);
+        var createdTask = await _taskRepository.AddAsync(newTask, ct);
         _logger.LogInformation("Successfully saved task with ID: {TaskId} to repository", createdTask.Id);
         return MapToDto(createdTask);
     }
 
-    public async Task UpdateTaskAsync(string id, UpdateTaskDto dto)
+    public async Task UpdateTaskAsync(string id, UpdateTaskDto dto, bool force = false, CancellationToken ct = default)
     {
         _logger.LogInformation("Updating task with ID: {TaskId}", id);
-        var existingTask = await _taskRepository.GetByIdAsync(id);
+        var existingTask = await _taskRepository.GetByIdAsync(id, ct);
         if (existingTask == null)
         {
             _logger.LogWarning("Task with ID {TaskId} not found for update", id);
             throw new TaskNotFoundException($"Task with ID {id} not found.");
         }
 
-        existingTask.Title = dto.Title;
-        existingTask.Description = dto.Description;
-        existingTask.Priority = dto.Priority;
-        existingTask.EstimatedEffort = dto.EstimatedEffort;
-        existingTask.Category = dto.Category;
-        existingTask.Type = dto.Type;
-        existingTask.Status = dto.Status;
-        existingTask.Dependencies = dto.Dependencies ?? new List<string>();
+        // Create a temporary clone for validation to prevent mutating memory if validation fails
+        var tempTask = new TaskItem(
+            id: existingTask.Id,
+            title: dto.Title,
+            description: dto.Description,
+            priority: dto.Priority,
+            estimatedEffort: dto.EstimatedEffort,
+            category: dto.Category,
+            type: dto.Type,
+            dependencies: dto.Dependencies ?? new List<string>(),
+            status: dto.Status,
+            createdAt: existingTask.CreatedAt);
+            
+        _taskFactory.ApplyBusinessRules(tempTask);
 
-        // Re-apply factory business rules on every update.
-        // This ensures rules like "Bug tasks are always High priority" cannot
-        // be bypassed by sending a PUT request with a lower priority value.
+        // Validating  the temporary clone data
+        var allTasks = await _taskRepository.GetAllAsync(ct);
+        _logger.LogInformation("Validating graph for updated task dependencies");
+        try
+        {
+            _graphService.EnsureNoCyclesOrInvalidDependencies(allTasks, tempTask);
+        }
+        catch (CircularDependencyException) when (force)
+        {
+            _logger.LogWarning("Bypassing circular dependency check for updated task {TaskId} due to force flag.", id);
+        }
+
+        // If validation passed (or was forced), safely update the real entity in memory
+        existingTask.Update(
+            dto.Title,
+            dto.Description,
+            dto.Priority,
+            dto.EstimatedEffort,
+            dto.Category,
+            dto.Type,
+            dto.Status,
+            dto.Dependencies ?? new List<string>());
+
         _taskFactory.ApplyBusinessRules(existingTask);
 
-        var allTasks = await _taskRepository.GetAllAsync();
-        _logger.LogInformation("Validating graph for updated task dependencies");
-        _graphService.EnsureNoCyclesOrInvalidDependencies(allTasks, existingTask);
-
-        await _taskRepository.UpdateAsync(existingTask);
+        await _taskRepository.UpdateAsync(existingTask, ct);
         _logger.LogInformation("Successfully updated task with ID: {TaskId} in repository", id);
     }
 
-    public async Task DeleteTaskAsync(string id)
+    public async Task DeleteTaskAsync(string id, CancellationToken ct = default)
     {
         _logger.LogInformation("Attempting to delete task with ID: {TaskId}", id);
-        var existingTask = await _taskRepository.GetByIdAsync(id);
+        var existingTask = await _taskRepository.GetByIdAsync(id, ct);
         if (existingTask == null)
         {
             _logger.LogWarning("Task with ID {TaskId} not found for deletion", id);
             throw new TaskNotFoundException($"Task with ID {id} not found.");
         }
 
-        // Check if any other task depends on this one
-        var allTasks = await _taskRepository.GetAllAsync();
+        var allTasks = await _taskRepository.GetAllAsync(ct);
         if (allTasks.Any(t => t.Dependencies.Contains(id)))
         {
             _logger.LogWarning("Cannot delete task {TaskId} - dependency constraint violated", id);
             throw new DomainException($"Cannot delete task {id} because other tasks depend on it.");
         }
 
-        await _taskRepository.DeleteAsync(id);
+        await _taskRepository.DeleteAsync(id, ct);
         _logger.LogInformation("Successfully deleted task with ID: {TaskId} from repository", id);
     }
 
-    public async Task<IEnumerable<TaskResponseDto>> GenerateExecutionPlanAsync()
+    public async Task<IEnumerable<TaskResponseDto>> GenerateExecutionPlanAsync(CancellationToken ct = default)
     {
-        var allTasks = await _taskRepository.GetAllAsync();
+        var allTasks = await _taskRepository.GetAllAsync(ct);
         var plan = _graphService.GenerateExecutionPlan(allTasks);
         return plan.Select(MapToDto);
     }

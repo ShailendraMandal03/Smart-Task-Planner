@@ -25,19 +25,17 @@ public class InMemoryRepositoryTests
     private InMemoryTaskRepository CreateRepo() => new();
 
     private static TaskItem MakeTask(TaskType type = TaskType.General,
-        string? id = null, string? dependsOn = null) => new()
-    {
-        Id = id ?? string.Empty,
-        Title = $"Task {type}",
-        Description = "Test task",
-        Priority = Priority.Medium,
-        EstimatedEffort = 2,
-        Category = "Test",
-        Type = type,
-        Dependencies = dependsOn != null ? new List<string> { dependsOn } : new List<string>(),
-        Status = TaskStatus.ToDo,
-        CreatedAt = DateTime.UtcNow
-    };
+        string? id = null, string? dependsOn = null) => new(
+        id: id ?? string.Empty,
+        title: $"Task {type}",
+        description: "Test task",
+        priority: Priority.Medium,
+        estimatedEffort: 2,
+        category: "Test",
+        type: type,
+        dependencies: dependsOn != null ? new List<string> { dependsOn } : new List<string>(),
+        status: TaskStatus.ToDo,
+        createdAt: DateTime.UtcNow);
 
    
     // Seed Data
@@ -234,8 +232,16 @@ public class InMemoryRepositoryTests
         var repo = CreateRepo();
         var existing = (await repo.GetByIdAsync("G-401"))!;
 
-        existing.Title = "Updated Title";
-        existing.Priority = Priority.Low;
+        // Use the entity's Update() method — direct property mutation is no longer allowed
+        existing.Update(
+            title: "Updated Title",
+            description: existing.Description,
+            priority: Priority.Low,
+            estimatedEffort: existing.EstimatedEffort,
+            category: existing.Category,
+            type: existing.Type,
+            status: existing.Status,
+            dependencies: existing.Dependencies);
         await repo.UpdateAsync(existing);
 
         var updated = await repo.GetByIdAsync("G-401");
@@ -250,7 +256,15 @@ public class InMemoryRepositoryTests
         var countBefore = (await repo.GetAllAsync()).Count();
 
         var existing = (await repo.GetByIdAsync("G-401"))!;
-        existing.Title = "Changed";
+        existing.Update(
+            title: "Changed",
+            description: existing.Description,
+            priority: existing.Priority,
+            estimatedEffort: existing.EstimatedEffort,
+            category: existing.Category,
+            type: existing.Type,
+            status: existing.Status,
+            dependencies: existing.Dependencies);
         await repo.UpdateAsync(existing);
 
         var countAfter = (await repo.GetAllAsync()).Count();

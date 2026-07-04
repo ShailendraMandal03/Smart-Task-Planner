@@ -1,0 +1,40 @@
+<div class="modal fade" tabindex="-1" role="dialog" aria-labelledby="cycleDialogModalLabel" aria-hidden="true" 
+     [class.show]="isVisible$ | async"
+     [style.display]="(isVisible$ | async) ? 'block' : 'none'">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title" id="cycleDialogModalLabel">
+          <span class="text-warning me-2">⚠</span> 
+          {{ modalService.mode === 'confirm' ? 'Circular Dependency Warning' : 'Circular Dependency Error' }}
+        </h5>
+      </div>
+      <div class="modal-body pt-2">
+        <p class="text-muted mb-2">
+          {{ modalService.mode === 'confirm' 
+            ? 'Saving this will create a circular dependency loop. Are you sure you want to proceed?' 
+            : 'Cannot generate the execution plan because a circular dependency exists in the database:' }}
+        </p>
+        
+        <div class="alert alert-warning p-2 d-flex align-items-center flex-wrap" style="font-family: monospace;">
+          <ng-container *ngFor="let node of modalService.cyclePath; let last = last">
+            <span class="fw-bold">{{ node }}</span>
+            <span *ngIf="!last" class="mx-2 text-danger">➔</span>
+          </ng-container>
+        </div>
+        
+      </div>
+      <div class="modal-footer border-0">
+        <ng-container *ngIf="modalService.mode === 'confirm'; else errorModeBtns">
+          <button type="button" class="btn btn-outline-secondary" (click)="modalService.cancel()">Cancel (Do Not Save)</button>
+          <button type="button" class="btn btn-warning" (click)="modalService.confirm()">Save Anyway</button>
+        </ng-container>
+        <ng-template #errorModeBtns>
+          <button type="button" class="btn btn-primary" (click)="modalService.cancel()">OK</button>
+        </ng-template>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop fade show" *ngIf="isVisible$ | async"></div>

@@ -1,5 +1,5 @@
 {
-  "name": "smart-task-planner-ui",
+  "name": "SmartTaskPlanner_Frontend",
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",

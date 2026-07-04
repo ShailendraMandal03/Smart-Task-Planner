@@ -1,4 +1,26 @@
 @import 'bootstrap/dist/css/bootstrap.min.css';
+
 body {
     background-color: #f8f9fa;
 }
+
+
+.skeleton-cell {
+    height: 1rem;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s infinite;
+    display: inline-block;
+    width: 80%;
+}
+
+.skeleton-cell.short  { width: 40%; }
+.skeleton-cell.medium { width: 60%; }
+.skeleton-cell.long   { width: 90%; }
+
+@keyframes skeleton-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+

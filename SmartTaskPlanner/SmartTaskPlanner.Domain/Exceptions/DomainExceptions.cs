@@ -9,8 +9,15 @@ public class DomainException : Exception
 
 public class CircularDependencyException : DomainException
 {
+    public IEnumerable<string>? CyclePath { get; }
+
     public CircularDependencyException(string message) : base(message)
     {
+    }
+
+    public CircularDependencyException(string message, IEnumerable<string> cyclePath) : base(message)
+    {
+        CyclePath = cyclePath;
     }
 }
 

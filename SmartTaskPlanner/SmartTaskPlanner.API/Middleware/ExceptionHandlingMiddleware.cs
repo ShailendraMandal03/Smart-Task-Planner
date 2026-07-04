@@ -46,10 +46,14 @@ public class ExceptionHandlingMiddleware
                 break;
 
             case CircularDependencyException ex:
-                context.Response.StatusCode = StatusCodes.Status400BadRequest;
+                context.Response.StatusCode = StatusCodes.Status409Conflict;
                 problemDetails.Title = "Circular Dependency Detected";
-                problemDetails.Status = StatusCodes.Status400BadRequest;
+                problemDetails.Status = StatusCodes.Status409Conflict;
                 problemDetails.Detail = ex.Message;
+                if (ex.CyclePath != null)
+                {
+                    problemDetails.Extensions["cyclePath"] = ex.CyclePath;
+                }
                 break;
 
             case SelfDependencyException ex:

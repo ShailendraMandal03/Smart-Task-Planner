@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "smart-task-planner-ui": {
+    "SmartTaskPlanner_Frontend": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:class": {
@@ -38,7 +38,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/smart-task-planner-ui",
+            "outputPath": "dist/SmartTaskPlanner_Frontend",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": [
@@ -58,6 +58,12 @@
           },
           "configurations": {
             "production": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.prod.ts"
+                }
+              ],
               "budgets": [
                 {
                   "type": "initial",
@@ -84,10 +90,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "smart-task-planner-ui:build:production"
+              "buildTarget": "SmartTaskPlanner_Frontend:build:production"
             },
             "development": {
-              "buildTarget": "smart-task-planner-ui:build:development"
+              "buildTarget": "SmartTaskPlanner_Frontend:build:development"
             }
           },
           "defaultConfiguration": "development"

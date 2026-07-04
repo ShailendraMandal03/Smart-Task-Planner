@@ -17,17 +17,16 @@ public class GraphService : IGraphService
     {
         var tasksDict = allTasks.ToDictionary(t => t.Id);
         
-        // Ensure new task is in the dictionary for cycle checking
         tasksDict[newTaskOrUpdatedTask.Id] = newTaskOrUpdatedTask;
 
-        // 1. Check for self-dependency
+        // checking for self-dependency
         if (newTaskOrUpdatedTask.Dependencies.Contains(newTaskOrUpdatedTask.Id))
         {
             _logger.LogWarning("Self-dependency detected for task {TaskId}", newTaskOrUpdatedTask.Id);
             throw new SelfDependencyException("A task cannot depend on itself.");
         }
 
-        // 2. Check for missing dependencies
+        // Checking for missing dependencies
         foreach (var depId in newTaskOrUpdatedTask.Dependencies)
         {
             if (!tasksDict.ContainsKey(depId))
@@ -37,27 +36,40 @@ public class GraphService : IGraphService
             }
         }
 
-        // 3. Cycle Detection using DFS
+        // checking Cycle Detection using DFS algorithm
         var visited = new HashSet<string>();
         var recursionStack = new HashSet<string>();
+        var currentPath = new List<string>();
 
         foreach (var task in tasksDict.Values)
         {
-            if (HasCycle(task.Id, tasksDict, visited, recursionStack))
+            if (HasCycle(task.Id, tasksDict, visited, recursionStack, currentPath, out var cyclePath))
             {
-                _logger.LogWarning("Circular dependency detected involving task {TaskId}", task.Id);
-                throw new CircularDependencyException("Circular dependency detected in the task graph.");
+                var pathString = string.Join(" ➔ ", cyclePath!);
+                _logger.LogWarning("Circular dependency detected involving task {TaskId}: {Path}", task.Id, pathString);
+                throw new CircularDependencyException($"Circular dependency detected: {pathString}", cyclePath!);
             }
         }
     }
 
-    private bool HasCycle(string currentId, Dictionary<string, TaskItem> tasksDict, HashSet<string> visited, HashSet<string> recursionStack)
+    private bool HasCycle(string currentId, Dictionary<string, TaskItem> tasksDict, HashSet<string> visited, HashSet<string> recursionStack, List<string> currentPath, out List<string>? cyclePath)
     {
+        cyclePath = null;
+        
+        currentPath.Add(currentId);
+
         if (recursionStack.Contains(currentId))
+        {
+            int index = currentPath.IndexOf(currentId);
+            cyclePath = currentPath.Skip(index).ToList();
             return true;
+        }
 
         if (visited.Contains(currentId))
+        {
+            currentPath.RemoveAt(currentPath.Count - 1);
             return false;
+        }
 
         visited.Add(currentId);
         recursionStack.Add(currentId);
@@ -66,12 +78,13 @@ public class GraphService : IGraphService
         {
             foreach (var depId in currentTask.Dependencies)
             {
-                if (HasCycle(depId, tasksDict, visited, recursionStack))
+                if (HasCycle(depId, tasksDict, visited, recursionStack, currentPath, out cyclePath))
                      return true;
             }
         }
 
         recursionStack.Remove(currentId);
+        currentPath.RemoveAt(currentPath.Count - 1);
         return false;
     }
 
@@ -83,8 +96,6 @@ public class GraphService : IGraphService
         var inDegree = tasksList.ToDictionary(t => t.Id, t => 0);
         var adjList = tasksList.ToDictionary(t => t.Id, t => new List<string>());
 
-        // Build Graph: Dependents (A -> B means B depends on A)
-        // If B depends on A, then edge is A -> B
         foreach (var task in tasksList)
         {
             foreach (var depId in task.Dependencies)
@@ -97,10 +108,8 @@ public class GraphService : IGraphService
             }
         }
 
-        // Priority Queue with Tie-Breaker
         var queue = new PriorityQueue<TaskItem, TaskItem>(new TaskExecutionComparer());
 
-        // Enqueue all tasks with in-degree 0
         foreach (var task in tasksList)
         {
             if (inDegree[task.Id] == 0)
@@ -129,6 +138,20 @@ public class GraphService : IGraphService
         if (executionPlan.Count != tasksList.Count)
         {
             _logger.LogError("Circular dependency detected during execution plan generation. Scheduled: {ScheduledCount}, Total: {TotalCount}", executionPlan.Count, tasksList.Count);
+            
+            // Try to find the exact cycle to return to the user
+            var visited = new HashSet<string>();
+            var recursionStack = new HashSet<string>();
+            var currentPath = new List<string>();
+            foreach (var task in tasksList)
+            {
+                if (HasCycle(task.Id, tasksDict, visited, recursionStack, currentPath, out var cyclePath))
+                {
+                    var pathString = string.Join(" ➔ ", cyclePath!);
+                    throw new CircularDependencyException($"Circular dependency detected during execution plan generation: {pathString}", cyclePath!);
+                }
+            }
+
             throw new CircularDependencyException("Circular dependency detected during execution plan generation.");
         }
 
@@ -142,15 +165,12 @@ public class GraphService : IGraphService
         {
             if (x == null || y == null) return 0;
 
-            // 1. Higher priority first (descending)
             int priorityComparison = y.Priority.CompareTo(x.Priority);
             if (priorityComparison != 0) return priorityComparison;
 
-            // 2. Lower estimated effort first (ascending)
             int effortComparison = x.EstimatedEffort.CompareTo(y.EstimatedEffort);
             if (effortComparison != 0) return effortComparison;
 
-            // 3. Tie-breaker by Id (ascending)
             return x.Id.CompareTo(y.Id);
         }
     }

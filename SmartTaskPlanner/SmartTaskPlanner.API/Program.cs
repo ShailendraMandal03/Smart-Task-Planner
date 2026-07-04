@@ -15,12 +15,18 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Configure CORS for Angular frontend
+// Configure CORS for Angular frontend.
+// Origins are driven by configuration (appsettings.json "AllowedOrigins"),
+// so they can be changed per environment without touching code.
+var allowedOrigins = builder.Configuration
+    .GetSection("AllowedOrigins")
+    .Get<string[]>() ?? Array.Empty<string>();
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", policy =>
+    options.AddPolicy("AllowAngularDev", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyMethod()
               .AllowAnyHeader();
     });
@@ -42,7 +48,7 @@ app.UseMiddleware<ExceptionHandlingMiddleware>();
 
 // app.UseHttpsRedirection();
 
-app.UseCors("AllowAll");
+app.UseCors("AllowAngularDev");
 
 app.UseAuthorization();
 

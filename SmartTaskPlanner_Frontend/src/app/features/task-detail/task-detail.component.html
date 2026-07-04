@@ -1,7 +1,7 @@
 <div class="container mt-4" *ngIf="task">
   <div class="card shadow-sm">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
-      <h3 class="mb-0">{{ task.title }}</h3>
+      <h3 class="mb-0">{{ task.title }} - {{ task.id }}</h3>
       <div>
         <a [routerLink]="['/tasks/edit', task.id]" class="btn btn-primary btn-sm">Edit</a>
         <a routerLink="/tasks" class="btn btn-outline-secondary btn-sm ms-2">Back</a>
@@ -35,7 +35,7 @@
       <h5 class="border-bottom pb-2">Dependencies</h5>
       <ul class="list-group list-group-flush" *ngIf="dependencies.length > 0; else noDeps">
         <li class="list-group-item" *ngFor="let dep of dependencies">
-          <a [routerLink]="['/tasks/view', dep.id]">{{ dep.title }}</a> 
+          <a [routerLink]="['/tasks/view', dep.id]">{{ dep.title }} - {{ dep.id }}</a> 
           <span class="badge bg-light text-dark ms-2">{{ TaskStatus[dep.status] }}</span>
         </li>
       </ul>

@@ -19,18 +19,27 @@
                     <th>Actions</th>
                 </tr>
             </thead>
-            <!--
-              KEY FIX: Subscribe to filteredTasks$ EXACTLY ONCE using "as tasks".
-              Previously, the template had TWO separate "| async" pipes:
-                1. *ngFor="let task of filteredTasks$ | async"
-                2. *ngIf="(filteredTasks$ | async)?.length === 0"
-              Each | async creates its own subscription → 2 subscriptions → 2 API calls.
-              Now we subscribe once here, assign the result to "tasks", and reuse it below.
-            -->
-            <tbody *ngIf="filteredTasks$ | async as tasks">
+
+            <!-- ── Skeleton rows shown on initial page load ───────────────────────
+                 isInitialLoading is true from service init until the first API
+                 response arrives. Each td gets an animated shimmer placeholder.
+                 ──────────────────────────────────────────────────────────────── -->
+            <tbody *ngIf="isInitialLoading">
+                <tr *ngFor="let i of [1,2,3,4,5]">
+                    <td><span class="skeleton-cell long"></span></td>
+                    <td><span class="skeleton-cell short"></span></td>
+                    <td><span class="skeleton-cell medium"></span></td>
+                    <td><span class="skeleton-cell short"></span></td>
+                    <td><span class="skeleton-cell short"></span></td>
+                    <td><span class="skeleton-cell medium"></span></td>
+                    <td><span class="skeleton-cell medium"></span></td>
+                </tr>
+            </tbody>
+
+            <tbody *ngIf="!isInitialLoading && (filteredTasks$ | async) as tasks">
                 <tr *ngFor="let task of tasks">
                     <td>
-                        <a [routerLink]="['/tasks/view', task.id]" class="text-decoration-none fw-bold">{{ task.title }}</a>
+                        <a [routerLink]="['/tasks/view', task.id]" class="text-decoration-none fw-bold">{{ task.title }} - {{ task.id }}</a>
                     </td>
                     <td>{{ task.category || '-' }}</td>
                     <td>{{ TaskType[task.type] }}</td>
@@ -65,3 +74,6 @@
         {{ isPageLoading ? 'Loading...' : 'Load More Tasks' }}
     </button>
 </div>
+
+
+<app-confirm-modal></app-confirm-modal>

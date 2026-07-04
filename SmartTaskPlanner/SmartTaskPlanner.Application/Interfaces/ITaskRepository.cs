@@ -4,10 +4,10 @@ namespace SmartTaskPlanner.Application.Interfaces;
 
 public interface ITaskRepository
 {
-    Task<IEnumerable<TaskItem>> GetAllAsync();
-    Task<IEnumerable<TaskItem>> GetPagedAsync(string? cursor, int pageSize);
-    Task<TaskItem?> GetByIdAsync(string id);
-    Task<TaskItem> AddAsync(TaskItem task);
-    Task UpdateAsync(TaskItem task);
-    Task DeleteAsync(string id);
+    Task<IEnumerable<TaskItem>> GetAllAsync(CancellationToken ct = default);
+    Task<IEnumerable<TaskItem>> GetPagedAsync(string? cursor, int pageSize, string? search = null, CancellationToken ct = default);
+    Task<TaskItem?> GetByIdAsync(string id, CancellationToken ct = default);
+    Task<TaskItem> AddAsync(TaskItem task, CancellationToken ct = default);
+    Task UpdateAsync(TaskItem task, CancellationToken ct = default);
+    Task DeleteAsync(string id, CancellationToken ct = default);
 }

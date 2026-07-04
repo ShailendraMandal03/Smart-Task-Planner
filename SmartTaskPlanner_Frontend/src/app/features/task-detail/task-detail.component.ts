@@ -20,30 +20,27 @@ export class TaskDetailComponent implements OnInit {
   private destroyRef = inject(DestroyRef);
 
   public task: TaskItem | null = null;
-  public dependencies: TaskItem[] = [];
+  public dependencies: {id: string, title: string, category: string, status: number}[] = [];
   
   public Priority = Priority;
   public TaskStatus = TaskStatus;
   public TaskType = TaskType;
 
   ngOnInit(): void {
-    // 1. Ensure tasks cache is loaded in background without forcing reload
-    this.taskService.loadAllTasks();
-
-    // 2. Reactively handle route parameter changes
+    // Reactively handle route parameter changes
     this.route.paramMap.pipe(
       switchMap(params => {
         const id = params.get('id');
-        // Fetch the specific task. Will hit cache if available, else API.
+        // Fetch the specific task and lookup data
         return combineLatest([
           this.taskService.getTask(id!),
-          this.taskService.tasks$
+          this.taskService.getTaskLookup()
         ]);
       }),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(([task, allTasks]) => {
       this.task = task;
-      // Filter the cached tasks to find the dependencies
+      // Filter the lookup tasks to find the dependencies
       this.dependencies = allTasks.filter(t => task.dependencies.includes(t.id));
     });
   }
