@@ -387,7 +387,7 @@ public class TaskServiceTests
     public async Task GetPagedTasksAsync_FirstPageWithoutCursor_CallsRepositoryAndReturnsMappedResponse()
     {
         var tasks = new[] { MakeEntity("T1"), MakeEntity("T2") };
-        _repoMock.Setup(r => r.GetPagedAsync(null, 3, It.IsAny<CancellationToken>())).ReturnsAsync(tasks);
+        _repoMock.Setup(r => r.GetPagedAsync(null, 3, It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(tasks);
 
         var result = await _sut.GetPagedTasksAsync(null, 2);
 
@@ -395,7 +395,7 @@ public class TaskServiceTests
         Assert.Equal(2, result.Items.Count());
         Assert.False(result.HasNext);
         Assert.Null(result.NextCursor);
-        _repoMock.Verify(r => r.GetPagedAsync(null, 3, It.IsAny<CancellationToken>()), Times.Once);
+        _repoMock.Verify(r => r.GetPagedAsync(null, 3, It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -403,7 +403,7 @@ public class TaskServiceTests
     {
         // Request page size of 2, repository receives size 3, returns 3 items
         var tasks = new[] { MakeEntity("T1"), MakeEntity("T2"), MakeEntity("T3") };
-        _repoMock.Setup(r => r.GetPagedAsync(null, 3, It.IsAny<CancellationToken>())).ReturnsAsync(tasks);
+        _repoMock.Setup(r => r.GetPagedAsync(null, 3, It.IsAny<string?>(), It.IsAny<CancellationToken>())).ReturnsAsync(tasks);
 
         var result = await _sut.GetPagedTasksAsync(null, 2);
 

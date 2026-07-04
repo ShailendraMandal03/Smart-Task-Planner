@@ -225,7 +225,7 @@ Nemetschek_Assignment/
 
 9. **Testing tasks default to "Quality Assurance" category**: If a Testing-type task is created with no category, the factory assigns it automatically.
 
-10. **CORS is open (`AllowAll`)**: This is acceptable for a local development/demo assignment. In production, origins would be restricted.
+10. **CORS is restricted by configuration**: CORS is configured to only allow specific origins defined in `appsettings.json` (currently `http://localhost:4200`), rather than an insecure `AllowAll` policy.
 
 ---
 
