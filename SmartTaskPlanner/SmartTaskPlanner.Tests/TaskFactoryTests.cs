@@ -6,19 +6,6 @@ using TaskStatus = SmartTaskPlanner.Domain.Enums.TaskStatus;
 
 namespace SmartTaskPlanner.Tests;
 
-/// <summary>
-/// Unit tests for <see cref="TaskFactory"/>.
-/// Validates that the factory applies type-specific business rules
-/// when creating TaskItem instances.
-///
-/// Covers:
-///  - General task: properties set as provided
-///  - Bug task: priority always overridden to High
-///  - Testing task: category defaults to "Quality Assurance" when empty
-///  - Testing task: preserves provided category
-///  - Development task: minimum effort of 1
-///  - All tasks: CreatedAt, Status defaults; Dependencies null-safety
-/// </summary>
 public class TaskFactoryTests
 {
     private readonly ITaskFactory _sut = new DomainTaskFactory();

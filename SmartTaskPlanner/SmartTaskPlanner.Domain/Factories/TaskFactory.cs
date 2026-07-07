@@ -7,14 +7,6 @@ public interface ITaskFactory
 {
     TaskItem Create(string title, string description, Priority priority, int estimatedEffort, string category, TaskType type, List<string> dependencies);
 
-    /// <summary>
-    /// Applies type-specific business rules to an existing task in-place.
-    /// Called on both Create and Update to ensure rules are never bypassed.
-    /// Rules:
-    ///  - Bug tasks are always High priority.
-    ///  - Testing tasks default to "Quality Assurance" category when none is provided.
-    ///  - Development tasks have a minimum estimated effort of 1.
-    /// </summary>
     void ApplyBusinessRules(TaskItem task);
 }
 
@@ -39,7 +31,6 @@ public class TaskFactory : ITaskFactory
         return task;
     }
 
-    /// <inheritdoc/>
     public void ApplyBusinessRules(TaskItem task)
     {
         // These internal setters are visible only within the Domain assembly.

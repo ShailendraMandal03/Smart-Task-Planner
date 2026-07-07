@@ -5,20 +5,6 @@ using TaskStatus = SmartTaskPlanner.Domain.Enums.TaskStatus;
 
 namespace SmartTaskPlanner.Tests;
 
-/// <summary>
-/// Unit tests for <see cref="InMemoryTaskRepository"/>.
-/// These tests verify CRUD operations and ID generation logic
-/// directly on the in-memory store.
-///
-/// Covers:
-///  - Seed data: tasks exist on construction, correct count
-///  - GetAllAsync: returns all tasks
-///  - GetByIdAsync: existing ID, non-existing ID
-///  - AddAsync: new task added, ID generation by type
-///  - UpdateAsync: existing task fields replaced
-///  - DeleteAsync: task removed
-///  - ID Generation: correct prefix and incrementing numbers per type
-/// </summary>
 public class InMemoryRepositoryTests
 {
     // Fresh repository instance for each test (in-memory, no shared state)

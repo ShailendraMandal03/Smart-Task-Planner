@@ -7,13 +7,6 @@ using TaskStatus = SmartTaskPlanner.Domain.Enums.TaskStatus;
 
 namespace SmartTaskPlanner.Tests;
 
-/// <summary>
-/// Unit tests for <see cref="GraphService"/>.
-/// Covers:
-///  - GenerateExecutionPlan: topological order, priority ordering, effort tie-breaking, ID tie-breaking
-///  - ValidateGraph: self-dependency, missing dep, direct cycle, indirect cycle
-///  - Edge cases: empty list, single task, disconnected graph
-/// </summary>
 public class GraphServiceTests
 {
     private readonly GraphService _sut;

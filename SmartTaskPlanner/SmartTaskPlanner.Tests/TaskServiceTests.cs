@@ -11,20 +11,6 @@ using TaskStatus = SmartTaskPlanner.Domain.Enums.TaskStatus;
 
 namespace SmartTaskPlanner.Tests;
 
-/// <summary>
-/// Unit tests for <see cref="TaskService"/>.
-/// All external dependencies (ITaskRepository, IGraphService, ITaskFactory)
-/// are replaced with Moq mocks so that these tests are true unit tests —
-/// no I/O or infrastructure code is executed.
-///
-/// Covers:
-///  - GetAllTasksAsync: empty list, multiple items
-///  - GetTaskByIdAsync: found, not found
-///  - CreateTaskAsync: success path, graph validation failure
-///  - UpdateTaskAsync: success path, not found, graph validation failure
-///  - DeleteTaskAsync: success path, not found, dependency constraint
-///  - GenerateExecutionPlanAsync: delegates to graph service
-/// </summary>
 public class TaskServiceTests
 {
     // ── Mocks ─────────────────────────────────────────────────────────────────
