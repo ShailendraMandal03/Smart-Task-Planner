@@ -13,6 +13,21 @@ public class InMemoryTaskRepository : ITaskRepository
 
     public InMemoryTaskRepository()
     {
+        /* 
+           TASK DEPENDENCY GRAPH:
+           - G-401 (Bootstrapping)       : No Dependencies
+           - B-301 (Bug Fix)             : No Dependencies
+           - G-403 (Swagger Docs)        : No Dependencies
+           - D-101 (Auth Service)        : Depends on G-401
+           - D-102 (Core API)            : Depends on G-401
+           - T-201 (Integration Test)    : Depends on G-401
+           - D-103 (Login UI)            : Depends on D-101
+           - D-104 (Task Dashboard UI)   : Depends on D-102
+           - T-202 (Unit Tests)          : Depends on D-101, D-102
+           - T-203 (E2E Tests)           : Depends on D-103, D-104
+           - G-402 (Deploy to Staging)   : Depends on T-202, T-203
+        */
+
         var g401 = new TaskItem(
             id: "G-401",
             title: "Project Bootstrapping & CI Setup",
