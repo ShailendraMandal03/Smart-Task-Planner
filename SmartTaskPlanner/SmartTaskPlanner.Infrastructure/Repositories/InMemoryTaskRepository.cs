@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Linq;
 using SmartTaskPlanner.Application.Interfaces;
 using SmartTaskPlanner.Domain.Entities;
 using SmartTaskPlanner.Domain.Enums;
@@ -162,14 +163,14 @@ public class InMemoryTaskRepository : ITaskRepository
     public Task<IEnumerable<TaskItem>> GetAllAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        return Task.FromResult(_tasks.Values.AsEnumerable());
+        return Task.FromResult(_tasks.Values.Select(CloneTask).AsEnumerable());
     }
 
     public Task<IEnumerable<TaskItem>> GetPagedAsync(string? cursor, int pageSize, string? search = null, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
         
-        var query = _tasks.Values.AsEnumerable();
+        var query = _tasks.Values.Select(CloneTask).AsEnumerable();
         
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -217,7 +218,7 @@ public class InMemoryTaskRepository : ITaskRepository
     {
         ct.ThrowIfCancellationRequested();
         _tasks.TryGetValue(id, out var task);
-        return Task.FromResult(task);
+        return Task.FromResult(task != null ? CloneTask(task) : null);
     }
 
     public Task<TaskItem> AddAsync(TaskItem task, CancellationToken ct = default)
@@ -227,14 +228,15 @@ public class InMemoryTaskRepository : ITaskRepository
         {
             task.AssignId(GenerateNextId(task.Type));
         }
-        _tasks[task.Id] = task;
-        return Task.FromResult(task);
+        var clone = CloneTask(task);
+        _tasks[clone.Id] = clone;
+        return Task.FromResult(CloneTask(clone));
     }
 
     public Task UpdateAsync(TaskItem task, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
-        _tasks[task.Id] = task;
+        _tasks[task.Id] = CloneTask(task);
         return Task.CompletedTask;
     }
 
@@ -243,6 +245,22 @@ public class InMemoryTaskRepository : ITaskRepository
         ct.ThrowIfCancellationRequested();
         _tasks.TryRemove(id, out _);
         return Task.CompletedTask;
+    }
+
+    private static TaskItem CloneTask(TaskItem task)
+    {
+        return new TaskItem(
+            id: task.Id,
+            title: task.Title,
+            description: task.Description,
+            priority: task.Priority,
+            estimatedEffort: task.EstimatedEffort,
+            category: task.Category,
+            type: task.Type,
+            dependencies: new List<string>(task.Dependencies),
+            status: task.Status,
+            createdAt: task.CreatedAt
+        );
     }
 
     private string GenerateNextId(TaskType type)
