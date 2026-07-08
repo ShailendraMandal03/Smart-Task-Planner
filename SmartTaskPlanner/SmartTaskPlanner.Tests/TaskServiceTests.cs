@@ -124,8 +124,10 @@ public class TaskServiceTests
                 dto.EstimatedEffort, dto.Category, dto.Type, dto.Dependencies))
             .Returns(createdEntity);
 
-        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<TaskItem>());
-        _graphMock.Setup(g => g.ValidateGraph(It.IsAny<IEnumerable<TaskItem>>(), createdEntity));
+        // No GetAllAsync setup needed — ValidateGraphAsync uses targeted fetches
+        _graphMock
+            .Setup(g => g.ValidateGraphAsync(createdEntity, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         repo.Setup(r => r.AddAsync(createdEntity, It.IsAny<CancellationToken>())).ReturnsAsync(createdEntity);
 
         var result = await _sut.CreateTaskAsync(dto);
@@ -145,7 +147,10 @@ public class TaskServiceTests
                 It.IsAny<int>(), It.IsAny<string>(), It.IsAny<TaskType>(), It.IsAny<List<string>>()))
             .Returns(entity);
 
-        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<TaskItem>());
+        // No GetAllAsync setup — ValidateGraphAsync fetches only what it needs
+        _graphMock
+            .Setup(g => g.ValidateGraphAsync(entity, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         repo.Setup(r => r.AddAsync(entity, It.IsAny<CancellationToken>())).ReturnsAsync(entity);
 
         await _sut.CreateTaskAsync(dto);
@@ -154,8 +159,8 @@ public class TaskServiceTests
             dto.Title, dto.Description, dto.Priority, dto.EstimatedEffort,
             dto.Category, dto.Type, dto.Dependencies), Times.Once);
 
-        _graphMock.Verify(g => g.ValidateGraph(
-            It.IsAny<IEnumerable<TaskItem>>(), entity), Times.Once);
+        _graphMock.Verify(g => g.ValidateGraphAsync(
+            entity, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -169,10 +174,9 @@ public class TaskServiceTests
                 It.IsAny<int>(), It.IsAny<string>(), It.IsAny<TaskType>(), It.IsAny<List<string>>()))
             .Returns(entity);
 
-        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Enumerable.Empty<TaskItem>());
         _graphMock
-            .Setup(g => g.ValidateGraph(It.IsAny<IEnumerable<TaskItem>>(), entity))
-            .Throws(new CircularDependencyException("Cycle detected"));
+            .Setup(g => g.ValidateGraphAsync(entity, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new CircularDependencyException("Cycle detected"));
 
         await Assert.ThrowsAsync<CircularDependencyException>(() => _sut.CreateTaskAsync(dto));
 
@@ -189,15 +193,18 @@ public class TaskServiceTests
         var dto = MakeUpdateDto();
 
         repo.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
-        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity });
+        // No GetAllAsync needed — ValidateGraphAsync fetches only the subgraph
+        _graphMock
+            .Setup(g => g.ValidateGraphAsync(It.IsAny<TaskItem>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         repo.Setup(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         await _sut.UpdateTaskAsync("T1", dto);
 
         // Verify business rules are re-applied and graph validation runs
         _factoryMock.Verify(f => f.ApplyBusinessRules(entity), Times.Once);
-        _graphMock.Verify(g => g.ValidateGraph(
-            It.IsAny<IEnumerable<TaskItem>>(), It.IsAny<TaskItem>()), Times.Once);
+        _graphMock.Verify(g => g.ValidateGraphAsync(
+            It.IsAny<TaskItem>(), It.IsAny<CancellationToken>()), Times.Once);
         repo.Verify(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -222,7 +229,9 @@ public class TaskServiceTests
             TaskType.Bug, TaskStatus.ToDo, new List<string>());
 
         repo.Setup(r => r.GetByIdAsync("B-301", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
-        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity });
+        _graphMock
+            .Setup(g => g.ValidateGraphAsync(It.IsAny<TaskItem>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         repo.Setup(r => r.UpdateAsync(entity, It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         // Make the mock actually apply the real business rule so we can assert the outcome
@@ -260,7 +269,9 @@ public class TaskServiceTests
         var dto = MakeUpdateDto("New Title");
 
         repo.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
-        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity });
+        _graphMock
+            .Setup(g => g.ValidateGraphAsync(It.IsAny<TaskItem>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
         repo.Setup(r => r.UpdateAsync(It.IsAny<TaskItem>(), It.IsAny<CancellationToken>())).Returns(Task.CompletedTask);
 
         await _sut.UpdateTaskAsync("T1", dto);
@@ -278,10 +289,9 @@ public class TaskServiceTests
         var dto = MakeUpdateDto();
 
         repo.Setup(r => r.GetByIdAsync("T1", It.IsAny<CancellationToken>())).ReturnsAsync(entity);
-        repo.Setup(r => r.GetAllAsync(It.IsAny<CancellationToken>())).ReturnsAsync(new[] { entity });
         _graphMock
-            .Setup(g => g.ValidateGraph(It.IsAny<IEnumerable<TaskItem>>(), It.IsAny<TaskItem>()))
-            .Throws(new CircularDependencyException("Cycle detected"));
+            .Setup(g => g.ValidateGraphAsync(It.IsAny<TaskItem>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new CircularDependencyException("Cycle detected"));
 
         await Assert.ThrowsAsync<CircularDependencyException>(() =>
             _sut.UpdateTaskAsync("T1", dto));

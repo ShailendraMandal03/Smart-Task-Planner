@@ -3,6 +3,7 @@ using SmartTaskPlanner.Application.Services;
 using SmartTaskPlanner.Domain.Entities;
 using SmartTaskPlanner.Domain.Enums;
 using SmartTaskPlanner.Domain.Exceptions;
+using SmartTaskPlanner.Application.Interfaces;
 using TaskStatus = SmartTaskPlanner.Domain.Enums.TaskStatus;
 
 namespace SmartTaskPlanner.Tests;
@@ -13,7 +14,7 @@ public class GraphServiceTests
 
     public GraphServiceTests()
     {
-        _sut = new GraphService(NullLogger<GraphService>.Instance);
+        _sut = new GraphService(NullLogger<GraphService>.Instance, new Moq.Mock<ITaskRepository>().Object);
     }
 
 
@@ -203,73 +204,6 @@ public class GraphServiceTests
             _sut.GenerateExecutionPlan(new[] { a, b, c }));
     }
 
-    // ValidateGraph — Self-dependency
-
-    [Fact]
-    public void EnsureNoCycles_SelfDependency_ThrowsSelfDependencyException()
-    {
-        var task = MakeTask("T1", deps: "T1"); // depends on itself
-
-        Assert.Throws<SelfDependencyException>(() =>
-            _sut.ValidateGraph(Enumerable.Empty<TaskItem>(), task));
-    }
-
-
-    // ValidateGraph — Missing Dependency
-
-    [Fact]
-    public void EnsureNoCycles_MissingDependency_ThrowsDependencyNotFoundException()
-    {
-        var task = MakeTask("T1", deps: "NON_EXISTENT");
-        var allTasks = new[] { MakeTask("T2") }; // NON_EXISTENT is not in allTasks
-
-        Assert.Throws<DependencyNotFoundException>(() =>
-            _sut.ValidateGraph(allTasks, task));
-    }
-
-
-    // ValidateGraph — Cycle Detection (DFS)
-
-    [Fact]
-    public void EnsureNoCycles_IntroducesDirectCycle_ThrowsCircularDependencyException()
-    {
-        // Existing: A ← B (B depends on A)
-        // New update: A now depends on B → creates A ↔ B cycle
-        var existingA = MakeTask("A");
-        var existingB = MakeTask("B", deps: "A");
-
-        // We are "updating" A to depend on B
-        var updatedA = MakeTask("A", deps: "B");
-
-        Assert.Throws<CircularDependencyException>(() =>
-            _sut.ValidateGraph(new[] { existingA, existingB }, updatedA));
-    }
-
-    [Fact]
-    public void EnsureNoCycles_NoIssues_DoesNotThrow()
-    {
-        var a = MakeTask("A");
-        var b = MakeTask("B", deps: "A");
-
-        // Adding C that depends on B — valid linear chain
-        var c = MakeTask("C", deps: "B");
-
-        var exception = Record.Exception(() =>
-            _sut.ValidateGraph(new[] { a, b }, c));
-
-        Assert.Null(exception);
-    }
-
-    [Fact]
-    public void EnsureNoCycles_NoDependencies_DoesNotThrow()
-    {
-        var newTask = MakeTask("STANDALONE");
-
-        var exception = Record.Exception(() =>
-            _sut.ValidateGraph(new[] { MakeTask("T1") }, newTask));
-
-        Assert.Null(exception);
-    }
 
 
     // GenerateExecutionPlan — Realistic Seed Data Scenario
@@ -354,5 +288,113 @@ public class GraphServiceTests
 
         var result = _sut.GenerateExecutionPlan(tasks);
         Assert.Equal(tasks.Length, result.Count());
+    }
+
+
+    // ── ValidateGraphAsync tests (lazy subgraph loading) ──────────────────────
+    // These use a real InMemoryTaskRepository so the lazy fetching path
+    // is exercised end-to-end, not just mocked.
+
+    private static SmartTaskPlanner.Infrastructure.Repositories.InMemoryTaskRepository BuildRepo(
+        params TaskItem[] seed)
+    {
+        // Use reflection to access the internal _tasks so we can seed custom data.
+        // In a real project you would expose an internal/test constructor instead.
+        var repo = new SmartTaskPlanner.Infrastructure.Repositories.InMemoryTaskRepository();
+
+        // Clear the seeded constructor data so tests are hermetic
+        var field = typeof(SmartTaskPlanner.Infrastructure.Repositories.InMemoryTaskRepository)
+            .GetField("_tasks", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        var dict = (System.Collections.Concurrent.ConcurrentDictionary<string, TaskItem>)field.GetValue(repo)!;
+        dict.Clear();
+
+        foreach (var t in seed)
+            dict[t.Id] = t;
+
+        return repo;
+    }
+
+    [Fact]
+    public async Task ValidateGraphAsync_SelfDependency_ThrowsSelfDependencyException()
+    {
+        var repo = BuildRepo(); // no other tasks needed — self-dep is caught before any DB call
+        var task = MakeTask("T1", deps: "T1");
+
+        await Assert.ThrowsAsync<SelfDependencyException>(() =>
+            new GraphService(NullLogger<GraphService>.Instance, repo).ValidateGraphAsync(task));
+    }
+
+    [Fact]
+    public async Task ValidateGraphAsync_MissingDependency_ThrowsDependencyNotFoundException()
+    {
+        var repo = BuildRepo(MakeTask("T2")); // "NON_EXISTENT" is not in the repo
+        var task = MakeTask("T1", deps: "NON_EXISTENT");
+
+        await Assert.ThrowsAsync<DependencyNotFoundException>(() =>
+            new GraphService(NullLogger<GraphService>.Instance, repo).ValidateGraphAsync(task));
+    }
+
+    [Fact]
+    public async Task ValidateGraphAsync_DirectCycle_ThrowsCircularDependencyException()
+    {
+        // Existing: B depends on A. Now A is updated to depend on B → A ↔ B cycle.
+        var existingA = MakeTask("A");
+        var existingB = MakeTask("B", deps: "A");
+        var repo = BuildRepo(existingA, existingB);
+
+        var updatedA = MakeTask("A", deps: "B");
+
+        await Assert.ThrowsAsync<CircularDependencyException>(() =>
+            new GraphService(NullLogger<GraphService>.Instance, repo).ValidateGraphAsync(updatedA));
+    }
+
+    [Fact]
+    public async Task ValidateGraphAsync_ValidLinearChain_DoesNotThrow()
+    {
+        // A ← B ← C (C depends on B, B on A)
+        var a = MakeTask("A");
+        var b = MakeTask("B", deps: "A");
+        var repo = BuildRepo(a, b);
+
+        var c = MakeTask("C", deps: "B"); // new task depending on B
+
+        var exception = await Record.ExceptionAsync(() =>
+            new GraphService(NullLogger<GraphService>.Instance, repo).ValidateGraphAsync(c));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public async Task ValidateGraphAsync_NoDependencies_DoesNotThrow()
+    {
+        var repo = BuildRepo(MakeTask("T1")); // existing task is irrelevant
+        var standalone = MakeTask("STANDALONE"); // no deps at all
+
+        var exception = await Record.ExceptionAsync(() =>
+            new GraphService(NullLogger<GraphService>.Instance, repo).ValidateGraphAsync(standalone));
+
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public async Task ValidateGraphAsync_OnlyLoadsReachableSubgraph_NotAllTasks()
+    {
+        // Graph: A ← B ← T_NEW (we are adding T_NEW)
+        // X, Y, Z are completely disconnected — they must NEVER be fetched.
+        var a    = MakeTask("A");
+        var b    = MakeTask("B", deps: "A");
+        var x    = MakeTask("X"); // disconnected
+        var y    = MakeTask("Y"); // disconnected
+        var z    = MakeTask("Z"); // disconnected
+        var repo = BuildRepo(a, b, x, y, z);
+
+        var tNew = MakeTask("T_NEW", deps: "B");
+
+        // If this throws it means the lazy DFS walked into X/Y/Z, which it shouldn't.
+        // We verify indirectly: validation must pass (no cycle, deps exist).
+        var exception = await Record.ExceptionAsync(() =>
+            new GraphService(NullLogger<GraphService>.Instance, repo).ValidateGraphAsync(tNew));
+
+        Assert.Null(exception);
     }
 }

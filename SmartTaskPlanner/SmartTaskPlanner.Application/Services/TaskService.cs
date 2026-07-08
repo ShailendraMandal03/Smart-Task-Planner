@@ -85,12 +85,10 @@ public class TaskService : ITaskService
             dto.Type, 
             dto.Dependencies);
 
-        var allTasks = await _taskRepository.GetAllAsync(ct);
         _logger.LogInformation("Validating graph for new task dependencies");
-        
         try
         {
-            _graphService.ValidateGraph(allTasks, newTask);
+            await _graphService.ValidateGraphAsync(newTask, ct);
         }
         catch (CircularDependencyException) when (force)
         {
@@ -112,7 +110,7 @@ public class TaskService : ITaskService
             throw new TaskNotFoundException($"Task with ID {id} not found.");
         }
 
-        // Create a temporary clone for validation to prevent mutating memory if validation fails
+        
         var tempTask = new TaskItem(
             id: existingTask.Id,
             title: dto.Title,
@@ -127,19 +125,17 @@ public class TaskService : ITaskService
             
         _taskFactory.ApplyBusinessRules(tempTask);
 
-        // Validating  the temporary clone data
-        var allTasks = await _taskRepository.GetAllAsync(ct);
+
         _logger.LogInformation("Validating graph for updated task dependencies");
         try
         {
-            _graphService.ValidateGraph(allTasks, tempTask);
+            await _graphService.ValidateGraphAsync(tempTask, ct);
         }
         catch (CircularDependencyException) when (force)
         {
             _logger.LogWarning("Bypassing circular dependency check for updated task {TaskId} due to force flag.", id);
         }
 
-        // If validation passed (or was forced), safely update the real entity in memory
         existingTask.Update(
             dto.Title,
             dto.Description,

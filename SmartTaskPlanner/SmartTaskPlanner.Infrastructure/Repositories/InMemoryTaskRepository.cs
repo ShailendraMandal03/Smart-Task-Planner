@@ -236,6 +236,17 @@ public class InMemoryTaskRepository : ITaskRepository
         return Task.FromResult(task != null ? CloneTask(task) : null);
     }
 
+
+    public Task<IEnumerable<TaskItem>> GetManyByIdsAsync(IEnumerable<string> ids, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        var result = ids
+            .Distinct()
+            .Where(id => _tasks.ContainsKey(id))
+            .Select(id => CloneTask(_tasks[id]));
+        return Task.FromResult(result);
+    }
+
     public Task<TaskItem> AddAsync(TaskItem task, CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();

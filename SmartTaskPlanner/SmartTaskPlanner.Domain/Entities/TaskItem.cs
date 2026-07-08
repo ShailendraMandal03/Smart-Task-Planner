@@ -41,7 +41,7 @@ public class TaskItem
         CreatedAt = createdAt;
     }
 
-    // ── Mutation methods — the only way to change state after construction ───
+    
 
     public void AssignId(string id) => Id = id;
 

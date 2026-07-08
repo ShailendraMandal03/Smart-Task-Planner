@@ -8,46 +8,131 @@ namespace SmartTaskPlanner.Application.Services;
 public class GraphService : IGraphService
 {
     private readonly ILogger<GraphService> _logger;
+    private readonly ITaskRepository _repository;
 
-    public GraphService(ILogger<GraphService> logger)
+    public GraphService(ILogger<GraphService> logger, ITaskRepository repository)
     {
         _logger = logger;
+        _repository = repository;
     }
-    public void ValidateGraph(IEnumerable<TaskItem> allTasks, TaskItem newTaskOrUpdatedTask)
-    {
-        var tasksDict = allTasks.ToDictionary(t => t.Id);
-        
-        tasksDict[newTaskOrUpdatedTask.Id] = newTaskOrUpdatedTask;
 
+    public async Task ValidateGraphAsync(TaskItem newTaskOrUpdatedTask, CancellationToken ct = default)
+    {
         if (newTaskOrUpdatedTask.Dependencies.Contains(newTaskOrUpdatedTask.Id))
         {
             _logger.LogWarning("Self-dependency detected for task {TaskId}", newTaskOrUpdatedTask.Id);
             throw new SelfDependencyException("A task cannot depend on itself.");
         }
 
-        foreach (var depId in newTaskOrUpdatedTask.Dependencies)
+        var subgraphCache = new Dictionary<string, TaskItem>
         {
-            if (!tasksDict.ContainsKey(depId))
+            [newTaskOrUpdatedTask.Id] = newTaskOrUpdatedTask
+        };
+
+        try
+        {
+            if (newTaskOrUpdatedTask.Dependencies.Count > 0)
             {
-                _logger.LogWarning("Dependency {DepId} not found for task {TaskId}", depId, newTaskOrUpdatedTask.Id);
-                throw new DependencyNotFoundException($"Dependency task with ID {depId} does not exist.");
+                var directDeps = await _repository.GetManyByIdsAsync(newTaskOrUpdatedTask.Dependencies, ct);
+                foreach (var dep in directDeps)
+                    subgraphCache[dep.Id] = dep;
+
+                foreach (var depId in newTaskOrUpdatedTask.Dependencies)
+                {
+                    if (!subgraphCache.ContainsKey(depId))
+                    {
+                        _logger.LogWarning("Dependency {DepId} not found for task {TaskId}", depId, newTaskOrUpdatedTask.Id);
+                        throw new DependencyNotFoundException($"Dependency task with ID {depId} does not exist.");
+                    }
+                }
             }
+
+            var visited        = new HashSet<string>();
+            var recursionStack = new HashSet<string>();
+            var currentPath    = new List<string>();
+
+            if (await HasCycleAsync(newTaskOrUpdatedTask.Id, subgraphCache, visited, recursionStack, currentPath, ct))
+            {
+                var pathString = string.Join(" ➔ ", currentPath);
+                _logger.LogWarning("Circular dependency detected for task {TaskId}: {Path}", newTaskOrUpdatedTask.Id, pathString);
+                throw new CircularDependencyException($"Circular dependency detected: {pathString}", new List<string>(currentPath));
+            }
+
+            _logger.LogInformation("Graph validation passed for task {TaskId} — subgraph size: {Size} node(s)",
+                newTaskOrUpdatedTask.Id, subgraphCache.Count);
         }
-
-        var visited = new HashSet<string>();
-        var recursionStack = new HashSet<string>();
-        var currentPath = new List<string>();
-
-        foreach (var task in tasksDict.Values)
+        catch (DomainException)
         {
-            if (HasCycle(task.Id, tasksDict, visited, recursionStack, currentPath, out var cyclePath))
-            {
-                var pathString = string.Join(" ➔ ", cyclePath!);
-                _logger.LogWarning("Circular dependency detected involving task {TaskId}: {Path}", task.Id, pathString);
-                throw new CircularDependencyException($"Circular dependency detected: {pathString}", cyclePath!);
-            }
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "An unexpected error occurred while validating the graph for task {TaskId}.", newTaskOrUpdatedTask.Id);
+            throw new DomainException($"An unexpected error occurred during graph validation: {ex.Message}");
         }
     }
+
+    
+    private async Task<bool> HasCycleAsync(
+        string currentId,
+        Dictionary<string, TaskItem> cache,
+        HashSet<string> visited,
+        HashSet<string> recursionStack,
+        List<string> currentPath,
+        CancellationToken ct)
+    {
+        currentPath.Add(currentId);
+
+        if (recursionStack.Contains(currentId))
+        {
+            int index = currentPath.IndexOf(currentId);
+            var cycle = currentPath.Skip(index).ToList();
+            currentPath.Clear();
+            currentPath.AddRange(cycle);
+            return true;
+        }
+
+        if (visited.Contains(currentId))
+        {
+            currentPath.RemoveAt(currentPath.Count - 1);
+            return false;
+        }
+
+        visited.Add(currentId);
+        recursionStack.Add(currentId);
+
+        if (!cache.TryGetValue(currentId, out var currentTask))
+        {
+            var fetched = (await _repository.GetManyByIdsAsync(new[] { currentId }, ct)).FirstOrDefault();
+            if (fetched != null)
+            {
+                cache[currentId] = fetched;
+                currentTask = fetched;
+            }
+        }
+
+        if (currentTask != null)
+        {
+            var uncachedDeps = currentTask.Dependencies.Where(d => !cache.ContainsKey(d)).ToList();
+            if (uncachedDeps.Count > 0)
+            {
+                var fetchedDeps = await _repository.GetManyByIdsAsync(uncachedDeps, ct);
+                foreach (var dep in fetchedDeps)
+                    cache[dep.Id] = dep;
+            }
+
+            foreach (var depId in currentTask.Dependencies)
+            {
+                if (await HasCycleAsync(depId, cache, visited, recursionStack, currentPath, ct))
+                    return true;
+            }
+        }
+
+        recursionStack.Remove(currentId);
+        currentPath.RemoveAt(currentPath.Count - 1);
+        return false;
+    }
+
 
     private bool HasCycle(string currentId, Dictionary<string, TaskItem> tasksDict, HashSet<string> visited, HashSet<string> recursionStack, List<string> currentPath, out List<string>? cyclePath)
     {

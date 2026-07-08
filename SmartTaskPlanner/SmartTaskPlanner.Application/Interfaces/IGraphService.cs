@@ -4,6 +4,7 @@ namespace SmartTaskPlanner.Application.Interfaces;
 
 public interface IGraphService
 {
-    void ValidateGraph(IEnumerable<TaskItem> allTasks, TaskItem newTaskOrUpdatedTask);
+    Task ValidateGraphAsync(TaskItem newTaskOrUpdatedTask, CancellationToken ct = default);
+
     IEnumerable<TaskItem> GenerateExecutionPlan(IEnumerable<TaskItem> allTasks);
 }
